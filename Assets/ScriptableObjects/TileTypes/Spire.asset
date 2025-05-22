@@ -12,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f111795d31db2b14cb46c1cbc6054e88, type: 3}
   m_Name: Spire
   m_EditorClassIdentifier: 
-  tileName: 
-  prefab: {fileID: 0}
+  tileName: Spire
+  prefab: {fileID: 1257446728075007610, guid: 35dd3dbe346733c40a6b520b55e56bc5, type: 3}
   isWalkable: 1
   moveCost: 1
   defenseBonusPercent: 0
-  damageBonusPercent: 0
+  damageBonusPercent: 15
   rangeModifier: 0
   accuracyModifierPercent: 0

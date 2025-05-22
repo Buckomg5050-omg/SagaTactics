@@ -37,6 +37,8 @@ public class PlayerUnitMover : MonoBehaviour
     private Vector2Int? currentHoverCoords = null;
     private List<GameObject> activeRangeHighlights = new List<GameObject>();
 
+    private Animator animator;
+
     void Awake()
     {
         inputActions = new PlayerInputActions();
@@ -83,6 +85,8 @@ public class PlayerUnitMover : MonoBehaviour
             selectedTileMarkerInstance.SetActive(false);
         }
 
+        animator = GetComponent<Animator>();
+
         ShowMoveRange();
         UpdateSelectionMarker();
     }
@@ -92,6 +96,11 @@ public class PlayerUnitMover : MonoBehaviour
         UpdateHoverHighlight();
         MovePlayer();
         UpdateSelectionMarker();
+
+        if (!isMoving && isSelected)
+        {
+            FaceCamera();
+        }
     }
 
     void OnClick(InputAction.CallbackContext context)
@@ -127,6 +136,8 @@ public class PlayerUnitMover : MonoBehaviour
                 targetWorldPosition = gridManager.GetPositionForHexFromCoordinate(currentGridCoords) + Vector3.up * yOffset;
                 isMoving = true;
 
+                if (animator) animator.SetBool("isMoving", true);
+
                 if (logClickEvents)
                     Debug.Log($"[Move] Moving to {currentGridCoords} → {targetWorldPosition}");
             }
@@ -145,11 +156,16 @@ public class PlayerUnitMover : MonoBehaviour
     {
         if (isMoving)
         {
+            FaceDirection(targetWorldPosition);
+
             transform.position = Vector3.MoveTowards(transform.position, targetWorldPosition, moveSpeed * Time.deltaTime);
             if ((transform.position - targetWorldPosition).sqrMagnitude < 0.0001f)
             {
                 transform.position = targetWorldPosition;
                 isMoving = false;
+
+                if (animator) animator.SetBool("isMoving", false);
+
                 Debug.Log($"[Move] Arrived at {currentGridCoords}, World: {transform.position}");
                 ShowMoveRange();
             }
@@ -276,6 +292,30 @@ public class PlayerUnitMover : MonoBehaviour
                 Destroy(marker);
         }
         activeRangeHighlights.Clear();
+    }
+
+    void FaceDirection(Vector3 targetPosition)
+    {
+        Vector3 direction = targetPosition - transform.position;
+        direction.y = 0f;
+        if (direction != Vector3.zero)
+        {
+            Quaternion targetRot = Quaternion.LookRotation(direction);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * 10f);
+        }
+    }
+
+    void FaceCamera()
+    {
+        Vector3 camPos = Camera.main.transform.position;
+        Vector3 dirToCam = camPos - transform.position;
+        dirToCam.y = 0f;
+        if (dirToCam != Vector3.zero)
+        {
+            Quaternion targetRot = Quaternion.LookRotation(-dirToCam);
+            targetRot *= Quaternion.Euler(0f, 180f, 0f);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * 10f);
+        }
     }
 
     private void OnDrawGizmosSelected()

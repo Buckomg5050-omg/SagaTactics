@@ -12,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f111795d31db2b14cb46c1cbc6054e88, type: 3}
   m_Name: Cliff
   m_EditorClassIdentifier: 
-  tileName: 
-  prefab: {fileID: 0}
+  tileName: Cliff
+  prefab: {fileID: 1103292582791712094, guid: dd1ae9f8587a5bc498facf28b80170dc, type: 3}
   isWalkable: 1
   moveCost: 1
-  defenseBonusPercent: 0
+  defenseBonusPercent: 10
   damageBonusPercent: 0
-  rangeModifier: 0
+  rangeModifier: 1
   accuracyModifierPercent: 0

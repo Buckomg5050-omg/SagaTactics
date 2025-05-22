@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f111795d31db2b14cb46c1cbc6054e88, type: 3}
   m_Name: Barrier
   m_EditorClassIdentifier: 
-  tileName: 
-  prefab: {fileID: 0}
-  isWalkable: 1
-  moveCost: 1
+  tileName: Barrier
+  prefab: {fileID: 481932829245239329, guid: b495c3f01724c8f498d9fe25a07ab44b, type: 3}
+  isWalkable: 0
+  moveCost: 0
   defenseBonusPercent: 0
   damageBonusPercent: 0
   rangeModifier: 0

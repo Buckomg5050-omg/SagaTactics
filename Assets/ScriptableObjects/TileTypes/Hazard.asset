@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f111795d31db2b14cb46c1cbc6054e88, type: 3}
   m_Name: Hazard
   m_EditorClassIdentifier: 
-  tileName: 
-  prefab: {fileID: 0}
+  tileName: Hazard
+  prefab: {fileID: 5574294694821405594, guid: 433ad0fa47641eb45be08ae9f6596803, type: 3}
   isWalkable: 1
   moveCost: 1
   defenseBonusPercent: 0

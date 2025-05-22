@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f111795d31db2b14cb46c1cbc6054e88, type: 3}
   m_Name: Normal
   m_EditorClassIdentifier: 
-  tileName: 
-  prefab: {fileID: 0}
+  tileName: Normal
+  prefab: {fileID: 6488502494666021405, guid: d9d00ea9c7f651b4d9e0d4cd5f57e102, type: 3}
   isWalkable: 1
   moveCost: 1
   defenseBonusPercent: 0

@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f111795d31db2b14cb46c1cbc6054e88, type: 3}
   m_Name: Marsh
   m_EditorClassIdentifier: 
-  tileName: 
-  prefab: {fileID: 0}
+  tileName: Marsh
+  prefab: {fileID: 554933928630356, guid: 4e8c28aa737c0b64cbab2cf90c2164b8, type: 3}
   isWalkable: 1
-  moveCost: 1
+  moveCost: 2
   defenseBonusPercent: 0
   damageBonusPercent: 0
   rangeModifier: 0
