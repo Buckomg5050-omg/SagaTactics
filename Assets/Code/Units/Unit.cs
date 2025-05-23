@@ -10,10 +10,11 @@ public class Unit : MonoBehaviour
     public int Echo = 5;
     public int Aura = 3;
 
-    public UnitInputHandler playerInput;
-    public EnemyAIController aiController;
-    public UnitAP unitAP;
-    public UnitSelector unitSelector;
+    public UnitInputHandler playerInput { get; private set; }
+    public EnemyAIController aiController { get; private set; }
+    public UnitAP unitAP { get; private set; }
+    public UnitSelector unitSelector { get; private set; }
+    public UnitStats unitStats { get; private set; }
 
     public UnitTeam Team { get; private set; }
 
@@ -25,8 +26,22 @@ public class Unit : MonoBehaviour
         aiController = GetComponent<EnemyAIController>();
         unitAP = GetComponent<UnitAP>();
         unitSelector = GetComponent<UnitSelector>();
+        unitStats = GetComponent<UnitStats>();
 
-        // Determine team from tag
+        if (unitStats == null)
+        {
+            Debug.LogError($"Unit '{unitName}' is missing a UnitStats component!", this);
+        }
+        if (unitAP == null)
+        {
+            Debug.LogError($"Unit '{unitName}' is missing a UnitAP component!", this);
+        }
+        
+        if (unitStats != null && !string.IsNullOrEmpty(unitStats.unitName))
+        {
+            this.unitName = unitStats.unitName;
+        }
+
         if (CompareTag("PlayerUnit"))
             Team = UnitTeam.Player;
         else if (CompareTag("EnemyUnit"))
@@ -38,23 +53,38 @@ public class Unit : MonoBehaviour
     public void BeginTurn()
     {
         unitAP?.RestoreFull();
-        Debug.Log($"{unitName} begins turn with {unitAP.CurrentAP} AP");
+
+        // MODIFIED: Enhanced Debug Log
+        if (unitStats != null && unitAP != null)
+        {
+            Debug.Log($"{unitName} begins turn. " +
+                      $"AP: {unitAP.CurrentAP}/{unitAP.MaxAP}, " +
+                      $"HP: {unitStats.currentHealth}/{unitStats.maxHealth}, " +
+                      $"Core: {unitStats.Core}, " +
+                      $"Defense: {unitStats.Defense}");
+        }
+        else // Fallback if components are missing, though Awake should catch UnitStats/UnitAP nulls
+        {
+            Debug.LogWarning($"{unitName} begins turn. Stats or AP component missing for full debug log.");
+            if (unitAP != null) Debug.Log($"{unitName} has {unitAP.CurrentAP} AP");
+        }
+
 
         unitSelector?.SetSelected(true);
 
-        // Update UI turn text using Unity's recommended method
         if (turnIndicator == null)
             turnIndicator = FindFirstObjectByType<TurnIndicatorUI>();
 
         turnIndicator?.ShowTurn(unitName, Team == UnitTeam.Player);
 
-        if (Team == UnitTeam.Player)
+        if (Team == UnitTeam.Player && playerInput != null)
         {
-            playerInput?.EnableInput(true);
+            playerInput.EnableInput(true);
+            Debug.Log($"Unit ({unitName}): Called playerInput.EnableInput(true). playerInput.inputEnabled is now: {playerInput.IsInputEnabledForDebug()}", this); 
         }
-        else if (Team == UnitTeam.Enemy)
+        else if (Team == UnitTeam.Enemy && aiController != null)
         {
-            aiController?.RunAI();
+            aiController.RunAI();
         }
     }
 
@@ -62,14 +92,15 @@ public class Unit : MonoBehaviour
     {
         unitSelector?.SetSelected(false);
 
-        if (Team == UnitTeam.Player)
+        if (Team == UnitTeam.Player && playerInput != null)
         {
-            playerInput?.EnableInput(false);
+            Debug.Log($"Unit ({unitName}): Preparing to call playerInput.EnableInput(false). playerInput.inputEnabled is currently: {playerInput.IsInputEnabledForDebug()}", this);
+            playerInput.EnableInput(false);
         }
     }
 
     public bool ShouldAutoEndTurn()
     {
-        return unitAP != null && unitAP.CurrentAP <= 0;
+        return unitAP != null && (unitAP.CurrentAP <= 0);
     }
 }

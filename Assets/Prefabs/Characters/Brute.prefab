@@ -120,6 +120,15 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 45e1b0555e40644429952d492fdb7354, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1360045169402819544}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 45e1b0555e40644429952d492fdb7354, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5999588929363586868}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 45e1b0555e40644429952d492fdb7354, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6110584932236019835}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 45e1b0555e40644429952d492fdb7354, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7229968758397752903}
   m_SourcePrefab: {fileID: 100100000, guid: 45e1b0555e40644429952d492fdb7354, type: 3}
 --- !u!1 &5176165054325855814 stripped
 GameObject:
@@ -216,7 +225,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   selectionMarkerPrefab: {fileID: 988668161368198169, guid: 993a28ff1c3ed974ab9007a8cbb7f271, type: 3}
-  reenableDelay: 0.25
 --- !u!114 &6907230770244361434
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -231,9 +239,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   hoverHighlightPrefab: {fileID: 988668161368198169, guid: 17ed12772d7db2240ad9e7ad15a0675c, type: 3}
   rangeHighlightPrefab: {fileID: 8448024327346680485, guid: 7658ccb6d4eb33344a08d2a765500ed2, type: 3}
+  attackHighlightPrefab: {fileID: 988668161368198169, guid: fb1b80ba07100624488036fe49ab0286, type: 3}
   previewMarkerPrefab: {fileID: 8448024327346680485, guid: 482b24c4fbfe99c4eba03ee02a64196d, type: 3}
   hoverYOffset: 0.3
   rangeYOffset: 0.3
+  attackRangeYOffset: 0.3
   previewYOffset: 0.31
   reenableDelay: 0.25
 --- !u!114 &-389738620478811588
@@ -248,6 +258,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 82572a9b0514ccb4ea8ed22253b3b7ef, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  groundLayerMask:
+    serializedVersion: 2
+    m_Bits: 64
 --- !u!114 &974810964097720331
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -260,7 +273,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 35f69912ea4b21e4c9dc2804fe32e892, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  isSelected: 1
 --- !u!114 &2294169300424865328
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -273,6 +285,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 74a027fcec98bcd4d9b09501fb2dc782, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  overrideCoordinate: {x: -1, y: -1}
 --- !u!114 &1360045169402819544
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -287,6 +300,61 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxActionPoints: 6
   startingActionPoints: -1
+--- !u!114 &5999588929363586868
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5176165054325855814}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6103c9ea33f0ad8498f71b81c43f327a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  unitName: Unit
+  isPlayerControlled: 1
+  Echo: 5
+  Aura: 3
+--- !u!114 &6110584932236019835
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5176165054325855814}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ef7f4bf0006e6a4db04377538a1426a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  unitName: New Unit
+  className: Warrior
+  classLevel: 1
+  Core: 10
+  Spark: 8
+  Echo: 12
+  Pulse: 10
+  Glimmer: 8
+  Aura: 10
+  Defense: 5
+  maxHealth: 0
+  currentHealth: 0
+  defenseBonusPercent: 0
+  accuracyBonusPercent: 0
+  abilities: []
+--- !u!114 &7229968758397752903
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5176165054325855814}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9decb18ffeb70804a90b8e8f917c3a60, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!4 &5521059228645739772 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 45e1b0555e40644429952d492fdb7354, type: 3}
