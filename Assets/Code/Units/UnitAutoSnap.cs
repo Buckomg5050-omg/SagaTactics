@@ -4,6 +4,10 @@ using System.Collections;
 [RequireComponent(typeof(UnitMover))]
 public class UnitAutoSnap : MonoBehaviour
 {
+    [Header("Optional Snap Coordinate")]
+    [Tooltip("If set, unit will snap to this tile on start instead of using world position.")]
+    public Vector2Int overrideCoordinate = new Vector2Int(-1, -1);
+
     void Start()
     {
         StartCoroutine(SnapAfterFrame());
@@ -11,8 +15,7 @@ public class UnitAutoSnap : MonoBehaviour
 
     private IEnumerator SnapAfterFrame()
     {
-        // Wait one frame so all transforms and grid state are initialized
-        yield return null;
+        yield return null; // Ensure grid is initialized
 
         HexGrid grid = FindFirstObjectByType<HexGrid>();
         if (grid == null)
@@ -21,8 +24,19 @@ public class UnitAutoSnap : MonoBehaviour
             yield break;
         }
 
-        Vector2Int coord = grid.GetCoordinateForPosition(transform.position);
-        HexTile tile = grid.GetTileAt(coord);
+        Vector2Int coordToUse;
+
+        // Use override if it's a valid tile
+        if (overrideCoordinate.x >= 0 && overrideCoordinate.y >= 0 && grid.IsValidCoordinate(overrideCoordinate))
+        {
+            coordToUse = overrideCoordinate;
+        }
+        else
+        {
+            coordToUse = grid.GetCoordinateForPosition(transform.position);
+        }
+
+        HexTile tile = grid.GetTileAt(coordToUse);
 
         if (tile != null)
         {
@@ -31,7 +45,7 @@ public class UnitAutoSnap : MonoBehaviour
         }
         else
         {
-            Debug.LogError($"[UnitAutoSnap] No valid tile under {name} at {coord}");
+            Debug.LogError($"[UnitAutoSnap] No valid tile under {name} at {coordToUse}");
         }
     }
 }

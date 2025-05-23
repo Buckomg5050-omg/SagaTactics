@@ -33,6 +33,12 @@ public class UnitHighlighter : MonoBehaviour
 
     void Awake()
     {
+        if (!CompareTag("PlayerUnit"))
+        {
+            enabled = false;
+            return;
+        }
+
         gridManager = FindFirstObjectByType<HexGrid>();
         pathfinder = new HexPathfinder(gridManager);
         mover = GetComponent<UnitMover>();
@@ -53,7 +59,7 @@ public class UnitHighlighter : MonoBehaviour
     {
         hoverUpdateTimer += Time.deltaTime;
 
-        if (mover.IsMoving || highlightsSuppressed)
+        if (mover == null || gridManager == null || pathfinder == null || mover.IsMoving || highlightsSuppressed)
         {
             hoverHighlightInstance?.SetActive(false);
             ClearPreview();
@@ -70,7 +76,7 @@ public class UnitHighlighter : MonoBehaviour
 
     public void ShowMoveRange(Vector2Int centerCoord)
     {
-        if (mover.IsMoving || highlightsSuppressed)
+        if (mover == null || gridManager == null || mover.IsMoving || highlightsSuppressed)
         {
             ClearMoveRange();
             return;
@@ -121,7 +127,7 @@ public class UnitHighlighter : MonoBehaviour
     {
         ClearPreview();
 
-        if (mover.IsMoving || highlightsSuppressed || targetTile == null || !targetTile.isWalkable)
+        if (mover == null || gridManager == null || highlightsSuppressed || mover.IsMoving || targetTile == null || !targetTile.isWalkable)
             return;
 
         HexTile startTile = gridManager.GetTileAt(mover.CurrentGridCoords);
@@ -171,7 +177,7 @@ public class UnitHighlighter : MonoBehaviour
 
     private void UpdateHoverHighlightAndPreview()
     {
-        if (hoverHighlightInstance == null || highlightsSuppressed)
+        if (hoverHighlightInstance == null || highlightsSuppressed || gridManager == null)
             return;
 
         Vector2 screenPos = Mouse.current.position.ReadValue();
@@ -213,12 +219,14 @@ public class UnitHighlighter : MonoBehaviour
         yield return new WaitForSeconds(reenableDelay);
         highlightsSuppressed = false;
 
-        ShowMoveRange(mover.CurrentGridCoords); // ✅ Re-show range after delay
+        if (mover != null)
+            ShowMoveRange(mover.CurrentGridCoords);
     }
 
     private bool IsValidCoordinate(Vector2Int coord)
     {
-        return coord.x >= 0 && coord.x < gridManager.gridSize.x &&
+        return gridManager != null &&
+               coord.x >= 0 && coord.x < gridManager.gridSize.x &&
                coord.y >= 0 && coord.y < gridManager.gridSize.y;
     }
 }

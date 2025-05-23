@@ -3,7 +3,6 @@ using UnityEngine.InputSystem;
 using System.Collections.Generic;
 
 [RequireComponent(typeof(UnitMover))]
-[RequireComponent(typeof(UnitHighlighter))]
 public class UnitInputHandler : MonoBehaviour
 {
     private Camera mainCam;
@@ -14,8 +13,16 @@ public class UnitInputHandler : MonoBehaviour
 
     private PlayerInputActions inputActions;
 
+    private bool inputEnabled = false;
+
     void Awake()
     {
+        if (!CompareTag("PlayerUnit"))
+        {
+            enabled = false;
+            return;
+        }
+
         mainCam = Camera.main;
         mover = GetComponent<UnitMover>();
         gridManager = FindFirstObjectByType<HexGrid>();
@@ -30,6 +37,7 @@ public class UnitInputHandler : MonoBehaviour
 
         inputActions.Enable();
         inputActions.Player.Click.performed += OnClick;
+        inputActions.Player.EndTurn.performed += OnEndTurn;
     }
 
     void OnDisable()
@@ -37,13 +45,27 @@ public class UnitInputHandler : MonoBehaviour
         if (inputActions != null)
         {
             inputActions.Player.Click.performed -= OnClick;
+            inputActions.Player.EndTurn.performed -= OnEndTurn;
             inputActions.Disable();
+        }
+    }
+
+    public void EnableInput(bool enable)
+    {
+        inputEnabled = enable;
+
+        if (highlighter != null)
+        {
+            if (enable)
+                highlighter.ShowMoveRange(mover.CurrentGridCoords);
+            else
+                highlighter.ClearMoveRange();
         }
     }
 
     private void OnClick(InputAction.CallbackContext context)
     {
-        if (mover.IsMoving || mainCam == null || gridManager == null)
+        if (!inputEnabled || mover.IsMoving || !mainCam || gridManager == null)
             return;
 
         Vector2 screenPos = Mouse.current.position.ReadValue();
@@ -57,7 +79,10 @@ public class UnitInputHandler : MonoBehaviour
 
             HexTile startTile = gridManager.GetTileAt(mover.CurrentGridCoords);
             if (startTile == null)
+            {
+                Debug.LogWarning("Could not find start tile at unit's current coordinates.");
                 return;
+            }
 
             List<HexTile> path = pathfinder.FindPath(startTile, targetTile);
             if (path == null || path.Count == 0)
@@ -66,24 +91,31 @@ public class UnitInputHandler : MonoBehaviour
                 return;
             }
 
-            // ✅ Skip the first tile (unit's current tile) for cost calculation
             float totalCost = 0f;
             for (int i = 1; i < path.Count; i++)
                 totalCost += path[i].tileType.moveCost;
 
-            if (totalCost > mover.MovementRange)
-            {
-                Debug.Log($"Path exceeds movement range. Cost: {totalCost}, Limit: {mover.MovementRange}");
-                return;
-            }
-
             Debug.Log($"Path found with {path.Count} steps. Cost: {totalCost}");
+
             mover.MoveAlongPath(path);
-            highlighter.ClearPreview();
         }
-        else
+    }
+
+    private void OnEndTurn(InputAction.CallbackContext context)
+    {
+        EndTurn();
+    }
+
+    public void EndTurn()
+    {
+        if (mover != null && mover.IsMoving)
+            return;
+
+        var manager = FindFirstObjectByType<TacticalCombatManager>();
+        if (manager != null && manager.IsPlayerTurn)
         {
-            Debug.Log("Raycast did not hit anything.");
+            Debug.Log("Ending player turn from button.");
+            manager.EndCurrentTurn();
         }
     }
 }

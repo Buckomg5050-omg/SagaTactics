@@ -23,6 +23,7 @@ public class UnitMover : MonoBehaviour
     private UnitFacing facing;
     private UnitAP unitAP;
     private int pendingAPCost = 0;
+    private Unit unit;
 
     void Awake()
     {
@@ -30,6 +31,8 @@ public class UnitMover : MonoBehaviour
         gridManager = FindFirstObjectByType<HexGrid>();
         facing = GetComponent<UnitFacing>();
         unitAP = GetComponent<UnitAP>();
+        unit = GetComponent<Unit>();
+
         SnapToGrid(currentGridCoords);
     }
 
@@ -74,6 +77,11 @@ public class UnitMover : MonoBehaviour
             if (animator) animator.SetBool("isMoving", false);
 
             OnMoveComplete?.Invoke();
+
+            if (unit != null && unit.ShouldAutoEndTurn())
+            {
+                FindFirstObjectByType<TacticalCombatManager>()?.EndCurrentTurn();
+            }
         }
     }
 
@@ -106,7 +114,13 @@ public class UnitMover : MonoBehaviour
 
         unitAP.Spend(pendingAPCost);
         pendingAPCost = 0;
+
         OnMoveComplete?.Invoke();
+
+        if (unit != null && unit.ShouldAutoEndTurn())
+        {
+            FindFirstObjectByType<TacticalCombatManager>()?.EndCurrentTurn();
+        }
     }
 
     public void SnapToGrid(Vector2Int gridCoords)

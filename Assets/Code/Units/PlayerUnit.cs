@@ -1,78 +1,40 @@
 using UnityEngine;
 
-[RequireComponent(typeof(UnitMover))]
-[RequireComponent(typeof(UnitFacing))]
-[RequireComponent(typeof(UnitSelector))]
-[RequireComponent(typeof(UnitHighlighter))]
-[RequireComponent(typeof(UnitInputHandler))]
+[RequireComponent(typeof(Unit))]
 public class PlayerUnit : MonoBehaviour
 {
-    private UnitMover mover;
-    private UnitFacing facing;
-    private UnitSelector selector;
-    private UnitHighlighter highlighter;
-    private UnitInputHandler inputHandler;
+    private HexGrid grid;
+    private Unit unit;
+    private UnitHighlighter unitHighlighter;
+    private UnitMover unitMover;
 
-    public bool isSelected = true;
-
-    void Awake()
+    void Start()
     {
-        mover = GetComponent<UnitMover>();
-        facing = GetComponent<UnitFacing>();
-        selector = GetComponent<UnitSelector>();
-        highlighter = GetComponent<UnitHighlighter>();
-        inputHandler = GetComponent<UnitInputHandler>();
-    }
+        grid = FindFirstObjectByType<HexGrid>();
+        unit = GetComponent<Unit>();
+        unitHighlighter = GetComponent<UnitHighlighter>();
+        unitMover = GetComponent<UnitMover>();
 
-   void Start()
-{
-    selector.SetSelected(isSelected);
-    selector.CurrentCoords = mover.CurrentGridCoords;
-
-    if (isSelected)
-        highlighter.ShowMoveRange(selector.CurrentCoords);
-
-    mover.OnMoveComplete += () =>
-    {
-        selector.CurrentCoords = mover.CurrentGridCoords;
-
-        if (isSelected)
+        if (grid == null || unit == null)
         {
-            facing.FaceCamera();
-            highlighter.ShowMoveRange(selector.CurrentCoords);
-            selector.SetSelected(true); // Reposition selection marker
-        }
-    };
-}
-
-
-    void Update()
-    {
-        if (!mover.IsMoving && isSelected)
-        {
-            facing.FaceCamera();
+            Debug.LogError("Missing grid or unit reference.");
+            return;
         }
 
-        if (!mover.IsMoving)
+        Vector2Int coords = grid.GetCoordinateForPosition(transform.position);
+
+        if (unitMover != null)
         {
-            selector.CurrentCoords = FindCurrentCoord();
+            unitMover.SnapToGrid(coords);
         }
-    }
 
-    private Vector2Int FindCurrentCoord()
-    {
-        HexGrid grid = FindFirstObjectByType<HexGrid>();
-        return grid.GetCoordinateForPosition(transform.position);
-    }
-
-    public void SetSelected(bool value)
-    {
-        isSelected = value;
-        selector.SetSelected(value);
-
-        if (value)
-            highlighter.ShowMoveRange(selector.CurrentCoords);
+        if (unitHighlighter != null)
+        {
+            unitHighlighter.ShowMoveRange(coords);
+        }
         else
-            highlighter.ClearMoveRange();
+        {
+            Debug.LogWarning($"[PlayerUnit] No UnitHighlighter found on {name} — skipping move range display.");
+        }
     }
 }
