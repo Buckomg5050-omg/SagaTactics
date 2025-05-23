@@ -36,6 +36,10 @@ public class HexGrid : MonoBehaviour
         {
             RequestLayoutGridUpdate();
         }
+         else
+        {
+        LayoutGrid(); // 🔥 This is what was missing at runtime
+        }
     }
 
     private void OnValidate()
@@ -211,6 +215,45 @@ public class HexGrid : MonoBehaviour
 
         return new Vector2Int(q, r);
     }
+    public List<HexTile> GetNeighbors(HexTile tile)
+{
+    List<HexTile> neighbors = new();
+    Vector2Int coord = tile.coordinate;
+
+    // Pointy-topped even-q layout
+    Vector2Int[] offsetsEven = new Vector2Int[]
+    {
+        new Vector2Int(+1, 0), new Vector2Int(0, +1), new Vector2Int(-1, +1),
+        new Vector2Int(-1, 0), new Vector2Int(-1, -1), new Vector2Int(0, -1)
+    };
+
+    Vector2Int[] offsetsOdd = new Vector2Int[]
+    {
+        new Vector2Int(+1, 0), new Vector2Int(+1, +1), new Vector2Int(0, +1),
+        new Vector2Int(-1, 0), new Vector2Int(0, -1), new Vector2Int(+1, -1)
+    };
+
+    Vector2Int[] offsets = (coord.y % 2 == 0) ? offsetsEven : offsetsOdd;
+
+    foreach (var offset in offsets)
+    {
+        Vector2Int neighborCoord = coord + offset;
+        if (IsValidCoordinate(neighborCoord) && tiles.TryGetValue(neighborCoord, out HexTile neighbor))
+        {
+            neighbors.Add(neighbor);
+        }
+    }
+
+    return neighbors;
+}
+
+
+    public bool IsValidCoordinate(Vector2Int coord)
+    {
+        return coord.x >= 0 && coord.x < gridSize.x &&
+               coord.y >= 0 && coord.y < gridSize.y;
+    }
+
 
     public HexTile GetTileAt(Vector2Int coords)
     {
