@@ -1,43 +1,48 @@
 using UnityEngine;
 using System.Collections.Generic;
+using System.Linq; 
 
 public class UnitMover : MonoBehaviour
 {
+    [Header("Movement Settings")]
     [SerializeField] private float moveSpeed = 5f;
-    [SerializeField] private float yOffset = 0.5f;
-    [SerializeField] private int movementRange = 6; // This is the unit's max move *potential* in AP/tiles, pathfinding checks actual reach
+    [Tooltip("Vertical offset from the hex tile's pivot to the unit's pivot.")]
+    [SerializeField] private float yOffset = 0.5f; 
+    [Tooltip("Max potential move distance if AP was infinite and tiles cost 1. Used by some highlighter logic as a fallback.")]
+    [SerializeField] private int movementRange = 6; 
 
     public bool IsMoving => isMoving;
     public Vector2Int CurrentGridCoords => currentGridCoords;
-    public int MovementRange => movementRange; // Used by highlighter perhaps, or as a base for pathfinding range limits
+    public int MovementRange => movementRange; 
 
-    public System.Action OnMoveComplete;
+    public event System.Action OnMoveStart; 
+    public event System.Action OnMoveSegmentComplete; 
+    public event System.Action OnMoveComplete; 
 
-    private Vector2Int currentGridCoords = Vector2Int.zero;
-    private Vector2Int targetGridCoords = Vector2Int.zero;
+    private Vector2Int currentGridCoords = Vector2Int.zero; 
+    private Vector2Int targetGridCoords = Vector2Int.zero; 
     private Vector3 targetWorldPosition;
     private bool isMoving = false;
 
     private Animator animator;
     private HexGrid gridManager;
-    private UnitFacing facing; // Assuming this is your component for handling visual rotation
-    private UnitAP unitAP;
-    private int pendingAPCost = 0;
+    private UnitFacing facing; 
+    private UnitAP unitAP; 
+    private int pendingAPCostForPath = 0; 
     private Unit unit;
 
     void Awake()
     {
-        animator = GetComponentInChildren<Animator>();
-        gridManager = FindFirstObjectByType<HexGrid>(); // Consider caching this more robustly if multiple grids or scenes
+        animator = GetComponentInChildren<Animator>(); 
+        gridManager = FindFirstObjectByType<HexGrid>(); 
         facing = GetComponent<UnitFacing>();
-        if (facing == null)
-        {
-            Debug.LogWarning($"UnitMover on {gameObject.name} did not find a UnitFacing component. Facing logic will be skipped.", this);
-        }
-        unitAP = GetComponent<UnitAP>();
+        unitAP = GetComponent<UnitAP>(); 
         unit = GetComponent<Unit>();
 
-        SnapToGrid(currentGridCoords); // Initial snap
+        if (gridManager == null) Debug.LogError($"UnitMover on {gameObject.name} could not find HexGrid!", this);
+        if (facing == null) Debug.LogWarning($"UnitMover on {gameObject.name} did not find a UnitFacing component. Facing logic will be skipped.", this);
+        if (unitAP == null) Debug.LogError($"UnitMover on {gameObject.name} did not find a UnitAP component! Movement will not cost AP.", this);
+        if (unit == null) Debug.LogError($"UnitMover on {gameObject.name} did not find a Unit component!", this);
     }
 
     void Update()
@@ -48,124 +53,122 @@ public class UnitMover : MonoBehaviour
         }
     }
 
-    public void MoveTo(Vector2Int targetCoords)
+    private void InitiateMoveToSegment(Vector2Int targetSegmentCoords)
     {
-        if (gridManager == null)
-        {
-            // This might happen if the grid is spawned later or this unit is instantiated before grid
-            Debug.LogError("HexGrid manager not found in MoveTo!", this);
-            return;
+        if (gridManager == null) { 
+            Debug.LogError("HexGrid manager not found in InitiateMoveToSegment!", this);
+            return; 
+        }
+        if (!gridManager.IsValidCoordinate(targetSegmentCoords)) { 
+            Debug.LogWarning($"InitiateMoveToSegment called with invalid coordinate: {targetSegmentCoords}", this);
+            return; 
+        }
+        if (targetSegmentCoords == currentGridCoords && !isMoving) { 
+            Debug.LogWarning($"InitiateMoveToSegment: Already at target {targetSegmentCoords} and not moving.", this);
+            OnMoveSegmentComplete?.Invoke(); 
+            return; 
         }
 
-        if (!gridManager.IsValidCoordinate(targetCoords))
-        {
-            Debug.LogWarning($"MoveTo called with invalid coordinate: {targetCoords}", this);
-            return;
-        }
-        if (targetCoords == currentGridCoords && !isMoving) // Don't restart move if already at target and not moving
-        {
-            return;
-        }
-
-        targetGridCoords = targetCoords;
-        // Ensure yOffset is applied correctly if GetPositionForHexFromCoordinate returns ground level
+        targetGridCoords = targetSegmentCoords;
         targetWorldPosition = gridManager.GetPositionForHexFromCoordinate(targetGridCoords) + (Vector3.up * yOffset);
         isMoving = true;
 
         if (animator) animator.SetBool("isMoving", true);
-        // Facing during movement is handled in MoveToTarget
+        if (facing != null) 
+        {
+            facing.SetTargetLookAtWorldPosition(targetWorldPosition);
+        }
     }
 
     private void MoveToTarget()
     {
-        if (facing != null)
-        {
-            // Face the direction of movement
-            facing.FaceDirection(targetWorldPosition);
-        }
-
         transform.position = Vector3.MoveTowards(transform.position, targetWorldPosition, moveSpeed * Time.deltaTime);
 
         if (Vector3.Distance(transform.position, targetWorldPosition) < 0.01f)
         {
-            transform.position = targetWorldPosition; // Snap to exact position
-            currentGridCoords = targetGridCoords;
+            transform.position = targetWorldPosition; 
+            currentGridCoords = targetGridCoords; 
             isMoving = false;
 
             if (animator) animator.SetBool("isMoving", false);
-
-            OnMoveComplete?.Invoke();
-
-            // Check for auto end turn after movement is fully complete
-            if (unit != null && unit.ShouldAutoEndTurn())
-            {
-                TacticalCombatManager.Instance?.EndCurrentTurn();
-            }
+            
+            OnMoveSegmentComplete?.Invoke(); 
         }
     }
 
     public void MoveAlongPath(List<HexTile> path)
     {
-        if (path == null || path.Count < 2) // Path must have at least current tile and one target tile
-        {
-            Debug.LogWarning("MoveAlongPath called with null or insufficient path.", this);
-            return;
-        }
-        if (unitAP == null)
-        {
-            Debug.LogError("UnitAP component not found on unit trying to MoveAlongPath.", this);
+        if (unitAP == null || unit == null) { 
+            Debug.LogError($"UnitMover.MoveAlongPath: Missing critical components (unitAP or unit). Aborting. unitAP null: {unitAP == null}, unit null: {unit == null}", this);
             return;
         }
 
+        if (path == null || path.Count < 2) 
+        {
+            Debug.LogWarning("MoveAlongPath called with null or insufficient path (must include current tile and at least one destination).", this);
+            return;
+        }
 
+        if (gridManager != null && gridManager.GetTileAt(currentGridCoords) != path[0])
+        {
+            Debug.LogWarning($"MoveAlongPath: Path does not start at unit's current tile ({currentGridCoords}). Path starts at {path[0]?.coordinate.ToString() ?? "NULL"}. This might lead to incorrect AP calculation or behavior.", this);
+        }
+
+        // --- CORRECTED: totalCost calculation moved before its use ---
         int totalCost = 0;
-        // Cost calculation starts from the first step (path[1]), as path[0] is the current tile
         for (int i = 1; i < path.Count; i++) 
         {
             if (path[i] == null || path[i].tileType == null)
             {
-                Debug.LogError($"Path contains null tile or tile with null tileType at index {i}", this);
-                return; // Invalid path data
+                Debug.LogError($"Path contains null tile or tile with null tileType at index {i}. Aborting move.", this);
+                return; 
             }
             totalCost += path[i].tileType.moveCost;
         }
+        // --- END CORRECTION ---
 
-        if (!unitAP.CanSpend(totalCost))
+        if (!unitAP.CanSpend(totalCost)) // Now totalCost is defined
         {
-            Debug.Log($"Not enough AP to move. Needed {totalCost}, but have {unitAP.CurrentAP}. Path length: {path.Count -1} steps.");
+            Debug.Log($"Not enough AP to move. Needed {totalCost}, but have {unitAP.CurrentAP}. Path length: {path.Count -1} steps.", this);
             return;
         }
 
-        pendingAPCost = totalCost; // Store the cost to be deducted upon completion
-        StopAllCoroutines(); // Stop any previous movement coroutine
+        pendingAPCostForPath = totalCost; 
+        StopAllCoroutines(); 
         StartCoroutine(MovePathCoroutine(path));
     }
 
     private System.Collections.IEnumerator MovePathCoroutine(List<HexTile> path)
     {
-        // First element (path[0]) is the starting tile, so iterate from index 1
+        OnMoveStart?.Invoke(); 
+
         for (int i = 1; i < path.Count; i++)
         {
-            if (path[i] == null)
-            {
+            if (path[i] == null) { 
                 Debug.LogError($"Null tile found in path at index {i} during MovePathCoroutine. Aborting move.", this);
-                pendingAPCost = 0; // Reset pending cost as move is aborted
-                yield break; // Exit coroutine
+                pendingAPCostForPath = 0; 
+                yield break; 
             }
-            MoveTo(path[i].coordinate);
-            // Wait until the unit is no longer moving towards the current segment's target
+            InitiateMoveToSegment(path[i].coordinate);
+            
             yield return new WaitUntil(() => !isMoving && currentGridCoords == path[i].coordinate);
         }
 
-        if (unitAP != null) // Double check unitAP before spending
+        if (unitAP != null) 
         {
-            unitAP.Spend(pendingAPCost);
+            unitAP.Spend(pendingAPCostForPath);
+            Debug.Log($"{unit?.unitName ?? gameObject.name} completed move. Spent {pendingAPCostForPath} AP. AP Remaining: {unitAP.CurrentAP}", this);
         }
-        pendingAPCost = 0;
+        pendingAPCostForPath = 0;
 
-        OnMoveComplete?.Invoke(); // Invoke after the entire path is traversed
+        if (facing != null)
+        {
+            facing.HoldCurrentFacing(); 
+            Debug.Log($"UnitMover ({unit?.unitName ?? gameObject.name}): Path complete. Called HoldCurrentFacing.", this);
+        }
 
-        // Check for auto end turn after the entire path movement is fully complete and AP spent
+        OnMoveComplete?.Invoke(); 
+
         if (unit != null && unit.ShouldAutoEndTurn())
         {
             TacticalCombatManager.Instance?.EndCurrentTurn();
@@ -176,45 +179,42 @@ public class UnitMover : MonoBehaviour
     {
         if (gridManager == null)
         {
-            gridManager = FindFirstObjectByType<HexGrid>(); // Attempt to re-acquire if null
+            gridManager = FindFirstObjectByType<HexGrid>(); 
             if (gridManager == null)
             {
-                Debug.LogError("HexGrid manager not found in SnapToGrid!", this);
+                Debug.LogError("HexGrid manager not found in SnapToGrid! Cannot snap.", this);
                 return;
             }
         }
 
         currentGridCoords = gridCoords;
-        // Ensure yOffset is applied correctly if GetPositionForHexFromCoordinate returns ground level
         targetWorldPosition = gridManager.GetPositionForHexFromCoordinate(currentGridCoords) + (Vector3.up * yOffset);
         transform.position = targetWorldPosition;
-        isMoving = false; // Ensure isMoving is reset
-    }
+        isMoving = false; 
 
-    // NEW METHOD to allow external calls for facing a target (e.g., before an attack)
-    /// <summary>
-    /// Makes the unit face a specific world position.
-    /// </summary>
-    /// <param name="targetWorldPositionToFace">The world position to face towards.</param>
-    public void FaceTarget(Vector3 targetWorldPositionToFace)
+        if (facing != null)
+        {
+            Transform actualModelToRotate = facing.GetModelToRotateForMover();
+            if(actualModelToRotate == null) actualModelToRotate = transform; 
+
+            Vector3 currentForward = actualModelToRotate.forward; 
+            currentForward.y = 0;
+            if (currentForward.sqrMagnitude < 0.001f) currentForward = Vector3.forward; 
+
+            facing.SnapLookAtWorldPosition(actualModelToRotate.position + currentForward.normalized * 0.1f); 
+        }
+    }
+    
+    public void FaceTarget(Vector3 targetWorldPositionToFace) 
     {
         if (facing != null)
         {
-            // We only want to change the Y rotation, keep the unit upright.
-            // The targetWorldPositionToFace should ideally be at the same Y-level as the unit's pivot
-            // or UnitFacing should handle this.
-            // For simplicity, if UnitFacing.FaceDirection expects a world point:
-            facing.FaceDirection(targetWorldPositionToFace);
+            facing.SetTargetLookAtWorldPosition(targetWorldPositionToFace); 
+            Debug.Log($"{unit?.unitName ?? gameObject.name} UnitMover.FaceTarget: Telling UnitFacing to look at {targetWorldPositionToFace} for attack.", this);
         }
         else
         {
-            // Fallback if no UnitFacing component: basic LookAt (might have undesirable X/Z rotation)
-            // Vector3 direction = (targetWorldPositionToFace - transform.position).normalized;
-            // if (direction != Vector3.zero)
-            // {
-            //     transform.rotation = Quaternion.LookRotation(direction);
-            // }
-            Debug.LogWarning($"UnitMover on {gameObject.name} called FaceTarget, but no UnitFacing component is assigned. Facing logic skipped.", this);
+            Debug.LogWarning($"UnitMover on {gameObject.name} called FaceTarget, but no UnitFacing component is assigned.", this);
         }
     }
 }

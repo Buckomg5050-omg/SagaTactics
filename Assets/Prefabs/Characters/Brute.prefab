@@ -212,6 +212,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e995589fa5ded0b4698280a1d459dfb1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  rotationSpeed: 10
+  modelToRotate: {fileID: 0}
+  idleCameraYawOffset: 180
 --- !u!114 &3160295316781438116
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -313,7 +316,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   unitName: Unit
-  isPlayerControlled: 1
   Echo: 5
   Aura: 3
 --- !u!114 &6110584932236019835
@@ -355,6 +357,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9decb18ffeb70804a90b8e8f917c3a60, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  sfxHitDelay: 0.25
+  vfxHitDelay: 0.35
+  takeHitAnimationDelay: 0.45
+  deathAnimationDuration: 4
+  hitImpactVFX_Prefab: {fileID: 2377693235651553361, guid: 9e75d561b7d58ef47b48e9106dd89fe7, type: 3}
+  sfx_MeleeHit: {fileID: 8300000, guid: d4419cb6daa2ef24e8032b7ca9361f72, type: 3}
+  vfxSpawnOffset: {x: 0, y: 1.5, z: 0}
 --- !u!4 &5521059228645739772 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 45e1b0555e40644429952d492fdb7354, type: 3}

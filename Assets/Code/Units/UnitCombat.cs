@@ -1,166 +1,244 @@
 using UnityEngine;
+using System.Collections;
+using System.Collections.Generic; // For List
 
-[RequireComponent(typeof(Unit))] // Unit.cs already gets UnitStats and UnitAP
+[RequireComponent(typeof(Unit))]
 public class UnitCombat : MonoBehaviour
 {
-    private Unit unit; // Reference to the core Unit data
-    private UnitStats stats; // Convenience reference to unit.unitStats
-    private UnitAP unitAP; // Reference to the unit's AP
-    private Animator animator; // Reference to the Animator for combat animations
+    private Unit unit;
+    private UnitStats stats;
+    private UnitAP unitAP;
+    private Animator animator;
 
-    // Constants for attack (we'll use these more in the next steps)
-    public const int MELEE_ATTACK_AP_COST = 1; // Example AP cost for a basic melee
-    public const int MELEE_ATTACK_RANGE = 1;   // Example range (adjacent hexes)
+    public const int MELEE_ATTACK_AP_COST = 1;
+    public const int MELEE_ATTACK_RANGE = 1;
+    
+    [Header("Timing Delays (from start of hit processing)")]
+    public float sfxHitDelay = 0.0f; 
+    public float vfxHitDelay = 0.5f;         // Independent delay for VFX
+    public float takeHitAnimationDelay = 0.5f; // Independent delay for Take_Hit animation
+    public float deathAnimationDuration = 4.0f;
 
-    // Optional: VFX Prefabs - assign these in the Inspector on the Unit Prefab later if you have them
-    // public GameObject hitVFXPrefab;
-    // public GameObject deathVFXPrefab;
+    [Header("Hit Effects")]
+    public GameObject hitImpactVFX_Prefab; 
+    public AudioClip sfx_MeleeHit;
+    public Vector3 vfxSpawnOffset = new Vector3(0f, 0.5f, 0f);
+        
+    private AudioSource unitAudioSource; 
 
     void Awake()
     {
         unit = GetComponent<Unit>();
-        stats = unit.unitStats; // Get stats via the Unit component
-        unitAP = unit.unitAP;   // Get AP via the Unit component
-        animator = GetComponentInChildren<Animator>(); // Assumes Animator is on a child or this object
+        stats = unit.unitStats;
+        unitAP = unit.unitAP;
+        animator = GetComponentInChildren<Animator>();
 
-        if (stats == null)
+        if (unit == null) Debug.LogError($"UnitCombat on {gameObject.name} is missing its Unit component reference!", this);
+        if (stats == null) Debug.LogError($"UnitCombat on {unit?.unitName ?? gameObject.name} could not find UnitStats component via Unit.cs!", this);
+        if (unitAP == null) Debug.LogError($"UnitCombat on {unit?.unitName ?? gameObject.name} could not find UnitAP component via Unit.cs!", this);
+
+        unitAudioSource = GetComponent<AudioSource>();
+        if (unitAudioSource == null)
         {
-            Debug.LogError($"UnitCombat on {unit.unitName} could not find UnitStats component via Unit.cs!", this);
-        }
-        if (unitAP == null)
-        {
-            Debug.LogError($"UnitCombat on {unit.unitName} could not find UnitAP component via Unit.cs!", this);
+            unitAudioSource = gameObject.AddComponent<AudioSource>();
+            unitAudioSource.playOnAwake = false;
         }
     }
 
-    // --- Health, Damage, and Death Logic ---
-
-    /// <summary>
-    /// Processes incoming damage to this unit.
-    /// </summary>
-    /// <param name="rawDamageAmount">The initial amount of damage before defense.</param>
     public void ProcessIncomingDamage(int rawDamageAmount)
     {
-        if (IsDead()) return; // Already defeated, no further action
+        if (IsDead()) return;
 
-        // Let UnitStats handle the actual health reduction and defense calculation
-        stats.TakeDamage(rawDamageAmount); 
+        stats.TakeDamage(rawDamageAmount);
 
-        // Log is already in UnitStats.TakeDamage, but we can add one here too if needed for combat flow
-        // Debug.Log($"{unit.unitName} is processing damage. Current HP: {stats.currentHealth}/{stats.maxHealth}");
-
-        if (animator != null)
+        if (!stats.IsDefeated()) 
         {
-            animator.SetTrigger("Take_Hit"); // Assumes "Take_Hit" trigger exists in Animator
+            StartCoroutine(PlayHitEffectsAndAnimationCoroutine());
         }
-        // if (hitVFXPrefab != null) Instantiate(hitVFXPrefab, transform.position, Quaternion.identity);
-
-        if (stats.IsDefeated())
+        else 
         {
-            HandleDefeat();
+            StartCoroutine(DeathSequenceCoroutine());
         }
     }
 
-    /// <summary>
-    /// Handles the unit's defeat sequence.
-    /// </summary>
-    private void HandleDefeat()
+    private class TimedEvent
     {
-        Debug.Log($"{unit.unitName} has been defeated (handled by UnitCombat)!");
+        public float TargetTime;
+        public System.Action Action;
+        public bool IsTriggered;
+        public string Name;
 
-        if (animator != null)
+        public TimedEvent(string name, float targetTime, System.Action action)
         {
-            animator.SetTrigger("Die"); // Assumes "Die" trigger exists in Animator
+            Name = name;
+            TargetTime = Mathf.Max(0, targetTime); // Ensure non-negative
+            Action = action;
+            IsTriggered = false;
         }
-        // if (deathVFXPrefab != null) Instantiate(deathVFXPrefab, transform.position, Quaternion.identity);
-        
-        // Notify the TacticalCombatManager
-        TacticalCombatManager.Instance?.UnitDied(unit); 
-
-        // Disable the unit's GameObject.
-        // For a prototype, SetActive(false) is fine.
-        // Later, you might want a "dead" state, disable specific components, or use an object pool.
-        gameObject.SetActive(false); 
-        // Or: Destroy(gameObject, 2f); // To remove after a delay (e.g., for death animation to play)
     }
 
-    /// <summary>
-    /// Checks if the unit is currently defeated (health <= 0).
-    /// </summary>
+    private IEnumerator PlayHitEffectsAndAnimationCoroutine()
+    {
+        // Create a list of events to manage
+        List<TimedEvent> events = new List<TimedEvent>();
+
+        // Add SFX event
+        if (sfx_MeleeHit != null && unitAudioSource != null)
+        {
+            events.Add(new TimedEvent("SFX", sfxHitDelay, () => {
+                unitAudioSource.PlayOneShot(sfx_MeleeHit);
+                Debug.Log($"{unit.unitName} playing sfx_MeleeHit (Targeted at {sfxHitDelay:F2}s).", this);
+            }));
+        }
+
+        // Add VFX event
+        if (hitImpactVFX_Prefab != null) // Check prefab existence before adding event
+        {
+             events.Add(new TimedEvent("VFX", vfxHitDelay, () => {
+                if (stats != null && !stats.IsDefeated()) // Re-check status at execution time
+                {
+                    Vector3 spawnPosition = transform.position + vfxSpawnOffset;
+                    Debug.Log($"Attempting to instantiate VFX: '{hitImpactVFX_Prefab.name}' at {spawnPosition} for {unit.unitName} (Targeted at {vfxHitDelay:F2}s).", this);
+                    Instantiate(hitImpactVFX_Prefab, spawnPosition, Quaternion.identity);
+                }
+            }));
+        } else {
+            Debug.LogWarning($"UNITCOMBAT ({unit.unitName}): hitImpactVFX_Prefab is NULL, VFX event will not be scheduled.", this);
+        }
+
+
+        // Add Animation event
+        if (animator != null) // Check animator existence
+        {
+            events.Add(new TimedEvent("Animation", takeHitAnimationDelay, () => {
+                 if (stats != null && !stats.IsDefeated()) // Re-check status
+                 {
+                    animator.SetTrigger("Take_Hit"); 
+                    Debug.Log($"{unit.unitName} playing Take_Hit animation (Targeted at {takeHitAnimationDelay:F2}s).", this);
+                 }
+            }));
+        }
+
+
+        float currentTime = 0f;
+        int eventsTriggeredCount = 0;
+        float maxDelay = 0f; // Find the longest delay to know when to stop waiting
+
+        foreach (TimedEvent evt in events)
+        {
+            if (evt.TargetTime > maxDelay)
+            {
+                maxDelay = evt.TargetTime;
+            }
+        }
+        
+        // If no events, exit early
+        if (events.Count == 0) yield break;
+
+        Debug.Log($"UNITCOMBAT ({unit.unitName}): Starting Hit Effects Coroutine. Max delay to wait for: {maxDelay:F2}s. Number of events: {events.Count}", this);
+
+        while (eventsTriggeredCount < events.Count && currentTime <= maxDelay + 0.1f) // Add a small buffer to ensure last event triggers
+        {
+            foreach (TimedEvent evt in events)
+            {
+                if (!evt.IsTriggered && currentTime >= evt.TargetTime)
+                {
+                    Debug.Log($"UNITCOMBAT ({unit.unitName}): Triggering event '{evt.Name}' at coroutine time {currentTime:F2}s.", this);
+                    evt.Action.Invoke();
+                    evt.IsTriggered = true;
+                    eventsTriggeredCount++;
+                }
+            }
+
+            if (eventsTriggeredCount == events.Count)
+            {
+                Debug.Log($"UNITCOMBAT ({unit.unitName}): All hit events triggered.", this);
+                break;
+            }
+
+            yield return null; // Wait for the next frame
+            currentTime += Time.deltaTime;
+        }
+        Debug.Log($"UNITCOMBAT ({unit.unitName}): Exiting Hit Effects Coroutine. Time elapsed: {currentTime:F2}s.", this);
+    }
+        
+    private IEnumerator DeathSequenceCoroutine()
+    {
+        Debug.Log($"{unit.unitName} has been defeated! Starting death sequence.", this);
+        if (animator != null) animator.SetTrigger("Die"); 
+        else Debug.LogWarning($"{unit.unitName} has no Animator, skipping Die animation.", this);
+            
+        // TODO: Add Death VFX/SFX here, similar to PlayHitEffectsAndAnimationCoroutine
+        // You'll need public variables for deathVFX_Prefab, sfx_Death, deathVFXOffset, sfxDeathDelay, vfxDeathDelay
+
+        Debug.Log($"{unit.unitName} waiting {deathAnimationDuration}s for death animation.", this);
+        yield return new WaitForSeconds(deathAnimationDuration);
+
+        Debug.Log($"{unit.unitName} death animation presumed complete. Notifying TCM and deactivating.", this);
+        TacticalCombatManager.Instance?.UnitDied(unit);
+        gameObject.SetActive(false);
+    }
+
     public bool IsDead()
     {
-        if (stats == null) return true; // If no stats, assume it can't fight
+        if (stats == null)
+        {
+            Debug.LogWarning($"Stats component is null for {unit?.unitName ?? gameObject.name}. Considering unit as dead.", this);
+            return true;
+        }
         return stats.IsDefeated();
     }
 
-    // --- Attack Action Stubs (to be implemented next) ---
-
-    /// <summary>
-    /// Checks if the unit can generally initiate any attack (e.g., has AP, not dead).
-    /// Does not check for specific ability costs or targets yet.
-    /// </summary>
     public bool CanConsiderAttacking()
     {
-        // For now, let's assume any attack costs at least 1 AP
         return unitAP != null && unitAP.CanSpend(1) && !IsDead();
     }
 
-    /// <summary>
-    /// Placeholder for performing a melee attack.
-    /// Actual implementation will require target selection, range checks, AP cost, damage calculation.
-    /// </summary>
-    /// <param name="targetUnit">The unit to attack.</param>
     public void PerformMeleeAttack(Unit targetUnit)
     {
-        // This is a more detailed stub than before, anticipating next steps
-        if (targetUnit == null || targetUnit.GetComponent<UnitCombat>().IsDead())
+        if (targetUnit == null) {
+            Debug.LogWarning($"{unit.unitName} tried to attack a null target.", this);
+            return;
+        }
+        UnitCombat targetUnitCombat = targetUnit.GetComponent<UnitCombat>();
+        if (targetUnitCombat == null || targetUnitCombat.IsDead())
         {
-            Debug.LogWarning($"{unit.unitName} tried to attack an invalid or dead target.");
+            Debug.LogWarning($"{unit.unitName} tried to attack an invalid or dead target ({targetUnit.unitName}).", this);
             return;
         }
 
-        if (!unitAP.CanSpend(MELEE_ATTACK_AP_COST))
+        if (unitAP == null || !unitAP.CanSpend(MELEE_ATTACK_AP_COST))
         {
-            Debug.LogWarning($"{unit.unitName} does not have enough AP for a melee attack ({MELEE_ATTACK_AP_COST} AP needed).");
+            Debug.LogWarning($"{unit.unitName} does not have enough AP for a melee attack ({MELEE_ATTACK_AP_COST} AP needed).", this);
             return;
         }
 
-        // TODO STEP: Implement range check here (e.g., using HexUtils.HexDistance)
-        // For now, we assume range check happened before calling this (e.g., in UnitInputHandler)
-
-        // --- If all checks pass: ---
         unitAP.Spend(MELEE_ATTACK_AP_COST);
-        
-        // Face the target (if UnitMover and FaceTarget exist)
+
         UnitMover mover = unit.GetComponent<UnitMover>();
         if (mover != null)
         {
             mover.FaceTarget(targetUnit.transform.position);
         }
-
-        Debug.Log($"{unit.unitName} performs MELEE ATTACK on {targetUnit.unitName}!");
-        if (animator != null)
+        else
         {
-            animator.SetTrigger("Attack_Melee"); // Assumes "Attack_Melee" trigger
+            Debug.LogWarning($"{unit.unitName} is missing a UnitMover component, cannot face target.", this);
         }
 
-        // Calculate damage (using GDD Power Strike like formula as example)
-        // (unit.core from Unit.cs is now stats.Core from UnitStats.cs)
-        int rawDamage = 10 + Mathf.FloorToInt(stats.Core * 0.5f); 
-
-        // Apply damage to target
-        UnitCombat targetCombat = targetUnit.GetComponent<UnitCombat>();
-        if (targetCombat != null)
+        Debug.Log($"{unit.unitName} performs MELEE ATTACK on {targetUnit.unitName}!", this);
+        if (animator != null)
         {
-            targetCombat.ProcessIncomingDamage(rawDamage);
+            animator.SetTrigger("Attack_Melee"); 
         }
         else
         {
-            Debug.LogError($"Target unit {targetUnit.unitName} is missing UnitCombat component!");
+            Debug.LogWarning($"{unit.unitName} is missing an Animator component, cannot play attack animation.", this);
         }
 
-        // Check if this unit should auto-end its turn (e.g., out of AP)
-        if (unit.ShouldAutoEndTurn())
+        int rawDamage = 10 + Mathf.FloorToInt(stats.Core * 0.5f);
+        targetUnitCombat.ProcessIncomingDamage(rawDamage);
+
+        if (unit != null && unit.ShouldAutoEndTurn())
         {
             TacticalCombatManager.Instance?.EndCurrentTurn();
         }
