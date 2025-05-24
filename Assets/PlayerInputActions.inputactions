@@ -632,13 +632,40 @@
                     "initialStateCheck": true
                 },
                 {
-                    "name": "PanCamera",
+                    "name": "Pan",
                     "type": "Value",
                     "id": "c34e659d-37dd-4068-b441-11a015da78f6",
                     "expectedControlType": "Vector2",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
+                },
+                {
+                    "name": "LookCamera",
+                    "type": "Value",
+                    "id": "c4515006-3782-4cc2-8b23-48b96c435e9a",
+                    "expectedControlType": "Vector2",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "ZoomCamera",
+                    "type": "Value",
+                    "id": "79b4ce0f-1002-49e2-9d12-b56a14cc394a",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "ToggleOrbitLock",
+                    "type": "Button",
+                    "id": "eec61e6c-d268-42bb-967c-9e631ab64305",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -671,7 +698,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "PanCamera",
+                    "action": "Pan",
                     "isComposite": true,
                     "isPartOfComposite": false
                 },
@@ -682,7 +709,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "PanCamera",
+                    "action": "Pan",
                     "isComposite": false,
                     "isPartOfComposite": true
                 },
@@ -693,7 +720,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "PanCamera",
+                    "action": "Pan",
                     "isComposite": false,
                     "isPartOfComposite": true
                 },
@@ -704,7 +731,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "PanCamera",
+                    "action": "Pan",
                     "isComposite": false,
                     "isPartOfComposite": true
                 },
@@ -715,9 +742,75 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "PanCamera",
+                    "action": "Pan",
                     "isComposite": false,
                     "isPartOfComposite": true
+                },
+                {
+                    "name": "",
+                    "id": "7b28d20a-3b4a-4a6d-b8b7-621fe4de83fa",
+                    "path": "<Mouse>/delta",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "LookCamera",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d53f8374-8ea9-4b2e-affe-f6ca875c314f",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "LookCamera",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "cff59f38-f03d-4b30-a03a-2a0edd916372",
+                    "path": "<Mouse>/scroll/y",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard&Mouse",
+                    "action": "ZoomCamera",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d8492edd-1537-485d-97c6-31154d1d0313",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ZoomCamera",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "195d2dcb-b7a8-4867-b0af-2dc7472e605a",
+                    "path": "<Keyboard>/c",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ToggleOrbitLock",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "36ce4583-8961-4a20-9512-2a62944de20d",
+                    "path": "",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ToggleOrbitLock",
+                    "isComposite": false,
+                    "isPartOfComposite": false
                 }
             ]
         }

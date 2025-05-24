@@ -718,13 +718,40 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""initialStateCheck"": true
                 },
                 {
-                    ""name"": ""PanCamera"",
+                    ""name"": ""Pan"",
                     ""type"": ""Value"",
                     ""id"": ""c34e659d-37dd-4068-b441-11a015da78f6"",
                     ""expectedControlType"": ""Vector2"",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""LookCamera"",
+                    ""type"": ""Value"",
+                    ""id"": ""c4515006-3782-4cc2-8b23-48b96c435e9a"",
+                    ""expectedControlType"": ""Vector2"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""ZoomCamera"",
+                    ""type"": ""Value"",
+                    ""id"": ""79b4ce0f-1002-49e2-9d12-b56a14cc394a"",
+                    ""expectedControlType"": ""Axis"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""ToggleOrbitLock"",
+                    ""type"": ""Button"",
+                    ""id"": ""eec61e6c-d268-42bb-967c-9e631ab64305"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -757,7 +784,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
-                    ""action"": ""PanCamera"",
+                    ""action"": ""Pan"",
                     ""isComposite"": true,
                     ""isPartOfComposite"": false
                 },
@@ -768,7 +795,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
-                    ""action"": ""PanCamera"",
+                    ""action"": ""Pan"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": true
                 },
@@ -779,7 +806,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
-                    ""action"": ""PanCamera"",
+                    ""action"": ""Pan"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": true
                 },
@@ -790,7 +817,7 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
-                    ""action"": ""PanCamera"",
+                    ""action"": ""Pan"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": true
                 },
@@ -801,9 +828,75 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
-                    ""action"": ""PanCamera"",
+                    ""action"": ""Pan"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""7b28d20a-3b4a-4a6d-b8b7-621fe4de83fa"",
+                    ""path"": ""<Mouse>/delta"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""LookCamera"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""d53f8374-8ea9-4b2e-affe-f6ca875c314f"",
+                    ""path"": """",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""LookCamera"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""cff59f38-f03d-4b30-a03a-2a0edd916372"",
+                    ""path"": ""<Mouse>/scroll/y"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Keyboard&Mouse"",
+                    ""action"": ""ZoomCamera"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""d8492edd-1537-485d-97c6-31154d1d0313"",
+                    ""path"": """",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""ZoomCamera"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""195d2dcb-b7a8-4867-b0af-2dc7472e605a"",
+                    ""path"": ""<Keyboard>/c"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""ToggleOrbitLock"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""36ce4583-8961-4a20-9512-2a62944de20d"",
+                    ""path"": """",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""ToggleOrbitLock"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -891,7 +984,10 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         // CameraControls
         m_CameraControls = asset.FindActionMap("CameraControls", throwIfNotFound: true);
         m_CameraControls_OrbitCamera = m_CameraControls.FindAction("OrbitCamera", throwIfNotFound: true);
-        m_CameraControls_PanCamera = m_CameraControls.FindAction("PanCamera", throwIfNotFound: true);
+        m_CameraControls_Pan = m_CameraControls.FindAction("Pan", throwIfNotFound: true);
+        m_CameraControls_LookCamera = m_CameraControls.FindAction("LookCamera", throwIfNotFound: true);
+        m_CameraControls_ZoomCamera = m_CameraControls.FindAction("ZoomCamera", throwIfNotFound: true);
+        m_CameraControls_ToggleOrbitLock = m_CameraControls.FindAction("ToggleOrbitLock", throwIfNotFound: true);
     }
 
     ~@PlayerInputActions()
@@ -1288,7 +1384,10 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
     private readonly InputActionMap m_CameraControls;
     private List<ICameraControlsActions> m_CameraControlsActionsCallbackInterfaces = new List<ICameraControlsActions>();
     private readonly InputAction m_CameraControls_OrbitCamera;
-    private readonly InputAction m_CameraControls_PanCamera;
+    private readonly InputAction m_CameraControls_Pan;
+    private readonly InputAction m_CameraControls_LookCamera;
+    private readonly InputAction m_CameraControls_ZoomCamera;
+    private readonly InputAction m_CameraControls_ToggleOrbitLock;
     /// <summary>
     /// Provides access to input actions defined in input action map "CameraControls".
     /// </summary>
@@ -1305,9 +1404,21 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @OrbitCamera => m_Wrapper.m_CameraControls_OrbitCamera;
         /// <summary>
-        /// Provides access to the underlying input action "CameraControls/PanCamera".
+        /// Provides access to the underlying input action "CameraControls/Pan".
         /// </summary>
-        public InputAction @PanCamera => m_Wrapper.m_CameraControls_PanCamera;
+        public InputAction @Pan => m_Wrapper.m_CameraControls_Pan;
+        /// <summary>
+        /// Provides access to the underlying input action "CameraControls/LookCamera".
+        /// </summary>
+        public InputAction @LookCamera => m_Wrapper.m_CameraControls_LookCamera;
+        /// <summary>
+        /// Provides access to the underlying input action "CameraControls/ZoomCamera".
+        /// </summary>
+        public InputAction @ZoomCamera => m_Wrapper.m_CameraControls_ZoomCamera;
+        /// <summary>
+        /// Provides access to the underlying input action "CameraControls/ToggleOrbitLock".
+        /// </summary>
+        public InputAction @ToggleOrbitLock => m_Wrapper.m_CameraControls_ToggleOrbitLock;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -1337,9 +1448,18 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @OrbitCamera.started += instance.OnOrbitCamera;
             @OrbitCamera.performed += instance.OnOrbitCamera;
             @OrbitCamera.canceled += instance.OnOrbitCamera;
-            @PanCamera.started += instance.OnPanCamera;
-            @PanCamera.performed += instance.OnPanCamera;
-            @PanCamera.canceled += instance.OnPanCamera;
+            @Pan.started += instance.OnPan;
+            @Pan.performed += instance.OnPan;
+            @Pan.canceled += instance.OnPan;
+            @LookCamera.started += instance.OnLookCamera;
+            @LookCamera.performed += instance.OnLookCamera;
+            @LookCamera.canceled += instance.OnLookCamera;
+            @ZoomCamera.started += instance.OnZoomCamera;
+            @ZoomCamera.performed += instance.OnZoomCamera;
+            @ZoomCamera.canceled += instance.OnZoomCamera;
+            @ToggleOrbitLock.started += instance.OnToggleOrbitLock;
+            @ToggleOrbitLock.performed += instance.OnToggleOrbitLock;
+            @ToggleOrbitLock.canceled += instance.OnToggleOrbitLock;
         }
 
         /// <summary>
@@ -1354,9 +1474,18 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @OrbitCamera.started -= instance.OnOrbitCamera;
             @OrbitCamera.performed -= instance.OnOrbitCamera;
             @OrbitCamera.canceled -= instance.OnOrbitCamera;
-            @PanCamera.started -= instance.OnPanCamera;
-            @PanCamera.performed -= instance.OnPanCamera;
-            @PanCamera.canceled -= instance.OnPanCamera;
+            @Pan.started -= instance.OnPan;
+            @Pan.performed -= instance.OnPan;
+            @Pan.canceled -= instance.OnPan;
+            @LookCamera.started -= instance.OnLookCamera;
+            @LookCamera.performed -= instance.OnLookCamera;
+            @LookCamera.canceled -= instance.OnLookCamera;
+            @ZoomCamera.started -= instance.OnZoomCamera;
+            @ZoomCamera.performed -= instance.OnZoomCamera;
+            @ZoomCamera.canceled -= instance.OnZoomCamera;
+            @ToggleOrbitLock.started -= instance.OnToggleOrbitLock;
+            @ToggleOrbitLock.performed -= instance.OnToggleOrbitLock;
+            @ToggleOrbitLock.canceled -= instance.OnToggleOrbitLock;
         }
 
         /// <summary>
@@ -1577,11 +1706,32 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnOrbitCamera(InputAction.CallbackContext context);
         /// <summary>
-        /// Method invoked when associated input action "PanCamera" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// Method invoked when associated input action "Pan" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>
         /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
-        void OnPanCamera(InputAction.CallbackContext context);
+        void OnPan(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "LookCamera" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnLookCamera(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "ZoomCamera" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnZoomCamera(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "ToggleOrbitLock" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnToggleOrbitLock(InputAction.CallbackContext context);
     }
 }
