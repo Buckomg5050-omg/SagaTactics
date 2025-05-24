@@ -360,10 +360,14 @@ MonoBehaviour:
   sfxHitDelay: 0.25
   vfxHitDelay: 0.35
   takeHitAnimationDelay: 0.45
-  deathAnimationDuration: 4
+  dyingAnimationHoldDuration: 3
+  sfxPlayDelayAfterVFX_Death: 0.1
   hitImpactVFX_Prefab: {fileID: 2377693235651553361, guid: 9e75d561b7d58ef47b48e9106dd89fe7, type: 3}
   sfx_MeleeHit: {fileID: 8300000, guid: d4419cb6daa2ef24e8032b7ca9361f72, type: 3}
   vfxSpawnOffset: {x: 0, y: 1.5, z: 0}
+  deathEffectVFX_Prefab: {fileID: 6638785126322571891, guid: 32a0a7c8df249c34b8ec6edddc4fda81, type: 3}
+  sfx_UnitDeath: {fileID: 8300000, guid: 6aba08920547faa4c8c40936a4bdd0d4, type: 3}
+  deathVfxSpawnOffset: {x: 0, y: 0.5, z: 0}
 --- !u!4 &5521059228645739772 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 45e1b0555e40644429952d492fdb7354, type: 3}
