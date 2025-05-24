@@ -1,13 +1,15 @@
 using UnityEngine;
 using UnityEngine.UI; // Required for Button type
+// using YourGame.Units; // Add this if your Unit class is in a namespace
 
 public class TurnUIController : MonoBehaviour
 {
     [Header("UI Button References")]
     [SerializeField] private Button endTurnButton;
-    [SerializeField] private Button attackModeButton; // NEW: Assign your AttackButton here in Inspector
+    [SerializeField] private Button attackModeButton;
 
-    // No need to store inputHandler globally here anymore, we'll get it from CurrentUnit
+    // [Header("UI Text References")] // Consider adding this if you want to display current unit name
+    // [SerializeField] private TMPro.TextMeshProUGUI currentUnitNameText; // Example for TextMeshPro
 
     private void Start()
     {
@@ -17,7 +19,7 @@ public class TurnUIController : MonoBehaviour
         }
         else
         {
-            endTurnButton.onClick.AddListener(OnEndTurnButtonClick); // Renamed for clarity
+            endTurnButton.onClick.AddListener(OnEndTurnButtonClick);
         }
 
         if (attackModeButton == null)
@@ -26,40 +28,61 @@ public class TurnUIController : MonoBehaviour
         }
         else
         {
-            attackModeButton.onClick.AddListener(OnAttackModeToggleButtonClick); // NEW
+            attackModeButton.onClick.AddListener(OnAttackModeToggleButtonClick);
         }
 
-        TacticalCombatManager.OnTurnChanged += HandleTurnChanged; // Renamed listener
-        UpdateButtonInteractability(); // Initial state set
+        // Subscribe to the CORRECT event from TacticalCombatManager
+        if (TacticalCombatManager.Instance != null)
+        {
+            TacticalCombatManager.OnActiveUnitChanged += HandleActiveUnitChanged;
+        }
+        else
+        {
+            // This could happen if TurnUIController's Start runs before TCM's Awake.
+            // A more robust solution might involve a GameManager that ensures order,
+            // or having TCM invoke an "Initialized" event that other managers subscribe to for their own setup.
+            Debug.LogWarning("TurnUIController: TacticalCombatManager.Instance is null on Start. Event subscription might fail if TCM initializes later.");
+        }
+        UpdateButtonInteractability(TacticalCombatManager.Instance?.CurrentUnit); // Initial state set, pass current unit if available
     }
 
     private void OnDestroy()
     {
-        // Always good to remove listeners
         if (endTurnButton != null) endTurnButton.onClick.RemoveListener(OnEndTurnButtonClick);
         if (attackModeButton != null) attackModeButton.onClick.RemoveListener(OnAttackModeToggleButtonClick);
-        TacticalCombatManager.OnTurnChanged -= HandleTurnChanged;
+        
+        // Unsubscribe from the CORRECT event
+        // No need to check for TacticalCombatManager.Instance != null here for static event unsubscription
+        TacticalCombatManager.OnActiveUnitChanged -= HandleActiveUnitChanged;
     }
 
-    private void HandleTurnChanged() // Renamed from UpdateButtonState for clarity
+    // MODIFIED: Handler now accepts a Unit parameter
+    private void HandleActiveUnitChanged(Unit activeUnit)
     {
-        UpdateButtonInteractability();
+        // activeUnit can be null if combat ends or no unit is active
+        // Debug.Log($"TurnUIController: HandleActiveUnitChanged - New active unit: {activeUnit?.unitName ?? "None"}");
+        UpdateButtonInteractability(activeUnit);
+
+        // If you added currentUnitNameText:
+        // if (currentUnitNameText != null)
+        // {
+        //     currentUnitNameText.text = activeUnit != null ? $"{activeUnit.unitName}'s Turn" : "Waiting...";
+        // }
     }
 
-    private void UpdateButtonInteractability()
+    // MODIFIED: Method now accepts the current unit to avoid repeated calls to TCM.Instance.CurrentUnit
+    private void UpdateButtonInteractability(Unit currentUnitToEvaluate)
     {
-        if (TacticalCombatManager.Instance == null)
+        if (TacticalCombatManager.Instance == null) // Should ideally not happen if Start() logic is robust
         {
-            // Manager might not be ready yet, disable buttons
             if (endTurnButton != null) endTurnButton.interactable = false;
             if (attackModeButton != null) attackModeButton.interactable = false;
             return;
         }
 
-        bool isPlayerUnitActive = TacticalCombatManager.Instance.CurrentUnit != null &&
-                                  TacticalCombatManager.Instance.CurrentUnit.Team == Unit.UnitTeam.Player &&
-                                  TacticalCombatManager.Instance.CurrentUnit.gameObject.activeInHierarchy; 
-                                  // Added activeInHierarchy check
+        bool isPlayerUnitActive = currentUnitToEvaluate != null &&
+                                  currentUnitToEvaluate.Team == Unit.UnitTeam.Player &&
+                                  currentUnitToEvaluate.gameObject.activeInHierarchy;
 
         if (endTurnButton != null)
         {
@@ -71,26 +94,25 @@ public class TurnUIController : MonoBehaviour
             bool canAttack = false;
             if (isPlayerUnitActive)
             {
-                UnitCombat combat = TacticalCombatManager.Instance.CurrentUnit.GetComponent<UnitCombat>();
+                UnitCombat combat = currentUnitToEvaluate.GetComponent<UnitCombat>();
                 if (combat != null)
                 {
-                    canAttack = combat.CanConsiderAttacking(); // Check if unit can even enter attack mode
+                    canAttack = combat.CanConsiderAttacking();
                 }
             }
             attackModeButton.interactable = canAttack;
         }
     }
 
-    // This method is called by the End Turn UI Button's OnClick event
-    public void OnEndTurnButtonClick() // Renamed for clarity
+    public void OnEndTurnButtonClick()
     {
         if (TacticalCombatManager.Instance == null || TacticalCombatManager.Instance.CurrentUnit == null) return;
 
-        Unit currentUnit = TacticalCombatManager.Instance.CurrentUnit;
+        Unit currentUnit = TacticalCombatManager.Instance.CurrentUnit; // This is fine for direct action
         if (currentUnit.Team == Unit.UnitTeam.Player)
         {
             UnitInputHandler inputHandler = currentUnit.GetComponent<UnitInputHandler>();
-            if (inputHandler != null && inputHandler.enabled) // Check if input handler is active
+            if (inputHandler != null && inputHandler.enabled)
             {
                 inputHandler.EndTurn();
             }
@@ -105,19 +127,17 @@ public class TurnUIController : MonoBehaviour
         }
     }
 
-    // NEW: This method is called by the Attack Mode UI Button's OnClick event
     public void OnAttackModeToggleButtonClick()
     {
         if (TacticalCombatManager.Instance == null || TacticalCombatManager.Instance.CurrentUnit == null) return;
         
-        Unit currentUnit = TacticalCombatManager.Instance.CurrentUnit;
+        Unit currentUnit = TacticalCombatManager.Instance.CurrentUnit; // Fine for direct action
         if (currentUnit.Team == Unit.UnitTeam.Player)
         {
             UnitInputHandler inputHandler = currentUnit.GetComponent<UnitInputHandler>();
-            if (inputHandler != null && inputHandler.enabled) // Check if input handler is active
+            if (inputHandler != null && inputHandler.enabled)
             {
-                // Add a log here to confirm this proxy method is being called
-                Debug.Log($"TurnUIController: OnAttackModeToggleButtonClick called for unit {currentUnit.unitName}. Instance ID: {inputHandler.GetInstanceID()}", this);
+                // Debug.Log($"TurnUIController: OnAttackModeToggleButtonClick called for unit {currentUnit.unitName}. Instance ID: {inputHandler.GetInstanceID()}", this);
                 inputHandler.HandleAttackModeToggle();
             }
             else
