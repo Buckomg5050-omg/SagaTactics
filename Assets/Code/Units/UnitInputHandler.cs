@@ -1,85 +1,74 @@
+// File: UnitInputHandler.cs
 using UnityEngine;
 using UnityEngine.InputSystem;
 using System.Collections.Generic;
 
 [RequireComponent(typeof(UnitMover))]
-[RequireComponent(typeof(UnitCombat))] 
-[RequireComponent(typeof(UnitHighlighter))] 
+[RequireComponent(typeof(UnitCombat))]
+// REMOVED: [RequireComponent(typeof(UnitHighlighter))] 
 public class UnitInputHandler : MonoBehaviour
 {
     [Header("Raycasting Settings")]
-    [SerializeField] private LayerMask groundLayerMask; 
+    [SerializeField] private LayerMask groundLayerMask;
 
     private Camera mainCam;
-    private Unit unit; 
+    private Unit unit;
+    private UnitStats unitStats;
     private UnitMover mover;
-    private UnitCombat combat; 
+    private UnitCombat combat;
     private HexGrid gridManager;
     private HexPathfinder pathfinder;
-    private UnitHighlighter highlighter;
+    // private UnitHighlighter highlighter; // REMOVED THIS FIELD
+
+    private MovementRangeCalculator movementRangeCalculator; // From previous refactor step
+    // private AttackRangeCalculator attackRangeCalculator; // For later
 
     private PlayerInputActions inputActions;
     private bool inputEnabled = false;
+    private bool isInAttackMode = false; 
+
+    private Vector2Int? lastHoveredCoord = null; 
 
     void Awake()
     {
         unit = GetComponent<Unit>();
         if (unit == null || unit.Team != Unit.UnitTeam.Player)
         {
-            Debug.LogWarning($"UnitInputHandler on {gameObject.name} is either not on a PlayerUnit or missing Unit component. Disabling self.", this);
-            enabled = false; 
+            enabled = false;
+            return;
+        }
+
+        unitStats = unit.unitStats;
+        if (unitStats == null)
+        {
+            Debug.LogError($"UnitInputHandler on {gameObject.name}: UnitStats component not found! Disabling.", this);
+            enabled = false;
             return;
         }
 
         mainCam = Camera.main;
-        if (mainCam == null) 
-        {
-            Debug.LogError("UnitInputHandler: Main Camera not found! Disabling input handler.", this);
-            enabled = false;
-            return;
-        }
-
         mover = GetComponent<UnitMover>();
-        combat = GetComponent<UnitCombat>(); 
-        highlighter = GetComponent<UnitHighlighter>(); 
-
+        combat = GetComponent<UnitCombat>();
         gridManager = FindFirstObjectByType<HexGrid>();
-        if (gridManager != null)
+
+        if (mainCam == null || mover == null || combat == null || gridManager == null)
         {
-            pathfinder = new HexPathfinder(gridManager);
-        }
-        else
-        {
-            Debug.LogError("UnitInputHandler: HexGrid not found in scene! Disabling input handler.", this);
-            enabled = false; 
-            return;
-        }
-        if (combat == null)
-        {
-             Debug.LogError($"UnitInputHandler ({gameObject.name}): UnitCombat component not found! Disabling input handler.", this);
+            Debug.LogError($"UnitInputHandler on {gameObject.name}: Missing critical components (Camera, Mover, Combat, or GridManager)! Disabling.", this);
             enabled = false;
             return;
         }
-        if (highlighter == null)
-        {
-             Debug.LogError($"UnitInputHandler ({gameObject.name}): UnitHighlighter component not found! Disabling input handler.", this);
-            enabled = false;
-            return;
-        }
-        if (mover == null)
-        {
-            Debug.LogError($"UnitInputHandler ({gameObject.name}): UnitMover component not found! Disabling input handler.", this);
-            enabled = false;
-            return;
-        }
+
+        pathfinder = new HexPathfinder(gridManager);
+        movementRangeCalculator = new MovementRangeCalculator(gridManager);
+        // highlighter = GetComponent<UnitHighlighter>(); // REMOVED INITIALIZATION
     }
 
     void OnEnable()
     {
-        if (unit == null) unit = GetComponent<Unit>();
-
-        if (unit == null || unit.Team != Unit.UnitTeam.Player) {
-            return; 
+        // Safety checks, though Awake should handle disabling if critical components are missing
+        if (unit == null || unit.Team != Unit.UnitTeam.Player || unitStats == null) {
+            enabled = false; // Ensure it's disabled if Awake didn't catch it or conditions change
+            return;
         }
 
         if (inputActions == null)
@@ -87,9 +76,10 @@ public class UnitInputHandler : MonoBehaviour
             inputActions = new PlayerInputActions();
             inputActions.Player.Click.performed += OnClick;
             inputActions.Player.EndTurn.performed += OnEndTurn;
-            inputActions.Player.Cancel.performed += OnCancel; 
+            inputActions.Player.Cancel.performed += OnCancel;
         }
         inputActions.Enable();
+        TacticalCombatManager.OnActiveUnitChanged += HandleActiveUnitChanged;
     }
 
     void OnDisable()
@@ -98,81 +88,250 @@ public class UnitInputHandler : MonoBehaviour
         {
             inputActions.Player.Click.performed -= OnClick;
             inputActions.Player.EndTurn.performed -= OnEndTurn;
-            inputActions.Player.Cancel.performed -= OnCancel; 
+            inputActions.Player.Cancel.performed -= OnCancel;
             inputActions.Disable();
         }
-        inputEnabled = false; 
+        inputEnabled = false; // Explicitly set inputEnabled to false
+        TacticalCombatManager.OnActiveUnitChanged -= HandleActiveUnitChanged;
+        
+        if (TileHighlighterService.Instance != null)
+        {
+            TileHighlighterService.Instance.ClearAllHighlights();
+        }
+        lastHoveredCoord = null;
+    }
+    
+    private void HandleActiveUnitChanged(Unit activeUnit)
+    {
+        if (!this.enabled && activeUnit != unit) return; // If this handler is already disabled and it's not our turn, do nothing
+
+        if (activeUnit == unit && unit.Team == Unit.UnitTeam.Player) 
+        {
+            EnableInputInternal(true);
+        }
+        else 
+        {
+            EnableInputInternal(false);
+        }
     }
 
-    public void EnableInput(bool enable)
+    private void EnableInputInternal(bool enable)
     {
         inputEnabled = enable;
+        // Debug.Log($"UnitInputHandler ({unit.unitName}): Input {(enable ? "Enabled" : "Disabled")}", this);
 
-        if (highlighter != null)
+        if (TileHighlighterService.Instance == null)
         {
-            if (enable)
+            // Debug.LogWarning($"UnitInputHandler ({unit.unitName}): TileHighlighterService.Instance is null in EnableInputInternal.", this);
+            return;
+        }
+
+        if (enable)
+        {
+            isInAttackMode = false; 
+            UpdateMovementRangeHighlight();
+            TileHighlighterService.Instance.ClearAttackRange(); 
+            TileHighlighterService.Instance.ClearPathPreview(); 
+        }
+        else
+        {
+            isInAttackMode = false; 
+            TileHighlighterService.Instance.ClearAllHighlights();
+            lastHoveredCoord = null; 
+        }
+    }
+    
+    private void UpdateMovementRangeHighlight()
+    {
+        if (!inputEnabled || isInAttackMode || mover == null || unitStats == null || unit.unitAP == null || movementRangeCalculator == null || TileHighlighterService.Instance == null)
+        {
+            if (TileHighlighterService.Instance != null) TileHighlighterService.Instance.ClearMovementRange();
+            return;
+        }
+        // Debug.Log($"UnitInputHandler ({unit.unitName}): Updating Movement Range Highlight. AP: {unit.unitAP.CurrentAP}", this);
+        HashSet<Vector2Int> reachableTiles = movementRangeCalculator.GetReachableTiles(mover.CurrentGridCoords, unit.unitAP.CurrentAP, unit);
+        TileHighlighterService.Instance.ShowMovementRange(reachableTiles);
+    }
+    
+    private void UpdateAttackRangeHighlight()
+    {
+        if (!inputEnabled || !isInAttackMode || mover == null || unitStats == null || unit.unitAP == null || TileHighlighterService.Instance == null)
+        {
+            if (TileHighlighterService.Instance != null) TileHighlighterService.Instance.ClearAttackRange();
+            return;
+        }
+        // Debug.Log($"UnitInputHandler ({unit.unitName}): Updating Attack Range Highlight.", this);
+        
+        HashSet<Vector2Int> attackableTiles = new HashSet<Vector2Int>();
+        int maxRange = Mathf.Max(unitStats.meleeAttackRange, unitStats.rangedAttackRange);
+        Vector2Int startCoord = mover.CurrentGridCoords;
+
+        if (maxRange > 0 && gridManager != null)
+        {
+             Queue<Vector2Int> frontier = new Queue<Vector2Int>();
+             Dictionary<Vector2Int, int> distanceMap = new Dictionary<Vector2Int, int>();
+             frontier.Enqueue(startCoord);
+             distanceMap[startCoord] = 0;
+
+             while(frontier.Count > 0)
+             {
+                 Vector2Int current = frontier.Dequeue();
+                 int dist = distanceMap[current];
+                 
+                 // For attack range, we primarily care about highlighting tiles with valid enemy targets
+                 Unit targetOnTile = gridManager.GetUnitOnTile(current);
+                 if (targetOnTile != null && targetOnTile.Team != unit.Team && targetOnTile.GetComponent<UnitCombat>() != null && !targetOnTile.GetComponent<UnitCombat>().IsDead())
+                 {
+                     // Check if within actual attack type ranges (melee or ranged)
+                     bool canMeleeTarget = unitStats.meleeAttackRange > 0 && dist <= unitStats.meleeAttackRange && unit.unitAP.CanSpend(unitStats.meleeAPCost);
+                     bool canRangeTarget = unitStats.rangedAttackRange > 0 && dist <= unitStats.rangedAttackRange && unit.unitAP.CanSpend(unitStats.rangedAPCost);
+                     // Basic LOS for ranged (more accurate check is in UnitCombat)
+                     bool hasLOS = true;
+                     if (canRangeTarget && (!canMeleeTarget || dist > unitStats.meleeAttackRange)) { // If it's a ranged possibility
+                        Vector3 eyePosition = transform.position + Vector3.up * 1.5f;
+                        Vector3 targetCenter = targetOnTile.transform.position + Vector3.up * 1.0f;
+                        int losCheckLayerMask = ~LayerMask.GetMask("Ignore Raycast", "PlayerUnit", "EnemyUnit");
+                        if (Physics.Linecast(eyePosition, targetCenter, out RaycastHit hitInfo, losCheckLayerMask, QueryTriggerInteraction.Ignore)) {
+                            if (hitInfo.transform != targetOnTile.transform && !hitInfo.transform.IsChildOf(targetOnTile.transform)) hasLOS = false;
+                        }
+                     }
+
+                     if ((canMeleeTarget || (canRangeTarget && hasLOS))) {
+                        attackableTiles.Add(current);
+                     }
+                 }
+
+
+                 if (dist < maxRange)
+                 {
+                     HexTile currentHexTile = gridManager.GetTileAt(current);
+                     if (currentHexTile != null) {
+                         foreach(HexTile neighbor in gridManager.GetNeighbors(currentHexTile))
+                         {
+                             if (neighbor != null && !distanceMap.ContainsKey(neighbor.coordinate))
+                             {
+                                 distanceMap[neighbor.coordinate] = dist + 1;
+                                 frontier.Enqueue(neighbor.coordinate);
+                             }
+                         }
+                     }
+                 }
+             }
+        }
+        TileHighlighterService.Instance.ShowAttackRange(attackableTiles);
+    }
+
+    public void HandleAttackModeToggle() // Called by UI Button
+    {
+        if (!inputEnabled || combat == null || unitStats == null || (mover != null && mover.IsMoving))
+        {
+            return;
+        }
+
+        isInAttackMode = !isInAttackMode; 
+        // Debug.Log($"UnitInputHandler ({unit.unitName}): Attack Mode Toggled. Now: {(isInAttackMode ? "ON" : "OFF")}", this);
+
+        if (TileHighlighterService.Instance == null) return;
+
+        TileHighlighterService.Instance.ClearPathPreview(); 
+        if (isInAttackMode)
+        {
+            bool canMelee = unitStats.meleeAttackRange > 0 && unit.unitAP.CanSpend(unitStats.meleeAPCost);
+            bool canRange = unitStats.rangedAttackRange > 0 && unit.unitAP.CanSpend(unitStats.rangedAPCost);
+            if (!canMelee && !canRange)
             {
-                highlighter.ToggleAttackMode(false); 
+                // Debug.Log($"{unit.unitName} cannot effectively use attack mode (Not enough AP or no attack types). AP: {unit.unitAP.CurrentAP}", this);
+                isInAttackMode = false; 
+                UpdateMovementRangeHighlight(); 
+                TileHighlighterService.Instance.ClearAttackRange();
+                return;
+            }
+            TileHighlighterService.Instance.ClearMovementRange();
+            UpdateAttackRangeHighlight();
+        }
+        else
+        {
+            TileHighlighterService.Instance.ClearAttackRange();
+            UpdateMovementRangeHighlight();
+        }
+    }
+
+    private void OnCancel(InputAction.CallbackContext context)
+    {
+        if (!inputEnabled || (mover != null && mover.IsMoving)) return;
+
+        if (isInAttackMode)
+        {
+            HandleAttackModeToggle(); 
+        }
+    }
+    
+    void Update() 
+    {
+        if (!inputEnabled || isInAttackMode || mover == null || mover.IsMoving || mainCam == null || gridManager == null || TileHighlighterService.Instance == null)
+        {
+            if (TileHighlighterService.Instance != null && lastHoveredCoord.HasValue)
+            {
+                TileHighlighterService.Instance.ShowTileHover(null);
+                if(!isInAttackMode) TileHighlighterService.Instance.ClearPathPreview(); // Clear preview if exiting hover logic
+                lastHoveredCoord = null;
+            }
+            return;
+        }
+
+        if (Mouse.current == null) return;
+        Vector2 screenPos = Mouse.current.position.ReadValue();
+        Ray ray = mainCam.ScreenPointToRay(screenPos);
+        Vector2Int? currentTileCoord = null;
+
+        if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, groundLayerMask))
+        {
+            HexTile hoveredTile = hit.collider.GetComponent<HexTile>();
+            if (hoveredTile != null && hoveredTile.isWalkable)
+            {
+                currentTileCoord = hoveredTile.coordinate;
+            }
+        }
+
+        if (currentTileCoord != lastHoveredCoord)
+        {
+            lastHoveredCoord = currentTileCoord;
+            TileHighlighterService.Instance.ShowTileHover(lastHoveredCoord); 
+            if (lastHoveredCoord.HasValue)
+            {
+                HexTile startTile = gridManager.GetTileAt(mover.CurrentGridCoords);
+                HexTile endTile = gridManager.GetTileAt(lastHoveredCoord.Value);
+                if (startTile != null && endTile != null && pathfinder != null)
+                {
+                    List<HexTile> path = pathfinder.FindPath(startTile, endTile);
+                    if (path != null && path.Count > 1) {
+                        int pathApCost = CalculatePathAPCost(path);
+                        if (unit.unitAP.CanSpend(pathApCost))
+                        {
+                            List<Vector2Int> pathCoords = new List<Vector2Int>();
+                            foreach(var tile in path) pathCoords.Add(tile.coordinate);
+                            TileHighlighterService.Instance.ShowPathPreview(pathCoords);
+                        } else {
+                             TileHighlighterService.Instance.ClearPathPreview();
+                        }
+                    } else {
+                        TileHighlighterService.Instance.ClearPathPreview();
+                    }
+                } else {
+                     TileHighlighterService.Instance.ClearPathPreview();
+                }
             }
             else
             {
-                highlighter.ToggleAttackMode(false); 
-                highlighter.ClearMoveRange();
-                highlighter.ClearAttackRange();
-                highlighter.ClearPreview();
+                TileHighlighterService.Instance.ClearPathPreview();
             }
-        }
-        else {
-            Debug.LogWarning($"UnitInputHandler ({gameObject.name}): EnableInput - highlighter is null!", this);
-        }
-    }
-
-    public void HandleAttackModeToggle()
-    {
-        if (combat == null || highlighter == null) 
-        {
-            Debug.LogError($"HandleAttackModeToggle on {gameObject.name} called but critical components (combat or highlighter) are null. Awake may not have run correctly for this instance or this is an unexpected call.", this);
-            return;
-        }
-
-        if (!inputEnabled || (mover != null && mover.IsMoving))
-        {
-            Debug.LogWarning($"HandleAttackModeToggle on {gameObject.name} exited. inputEnabled: {inputEnabled}, isMoving: {mover?.IsMoving}", this);
-            return;
-        }
-
-        if (!highlighter.IsInAttackMode) 
-        {
-            if (!combat.CanConsiderAttacking()) 
-            {
-                Debug.Log($"{unit?.unitName ?? gameObject.name} cannot enter attack mode (CanConsiderAttacking failed). AP: {unit?.unitAP?.CurrentAP}", this);
-                return;
-            }
-        }
-        
-        highlighter.ToggleAttackMode(!highlighter.IsInAttackMode);
-        Debug.Log(highlighter.IsInAttackMode ? $"{unit?.unitName ?? gameObject.name} ATTACK MODE: ON" : $"{unit?.unitName ?? gameObject.name} ATTACK MODE: OFF (Movement Mode)", this);
-    }
-    
-    private void OnCancel(InputAction.CallbackContext context)
-    {
-        if (!inputEnabled || (mover != null && mover.IsMoving) || highlighter == null)
-        {
-            return;
-        }
-
-        if (highlighter.IsInAttackMode)
-        {
-            highlighter.ToggleAttackMode(false); 
-            Debug.Log($"{unit?.unitName ?? gameObject.name} ATTACK MODE: OFF (Cancelled via input action)", this);
         }
     }
 
     private void OnClick(InputAction.CallbackContext context)
     {
-        if (!inputEnabled || (mover != null && mover.IsMoving) || mainCam == null || gridManager == null || combat == null || highlighter == null)
+        if (!inputEnabled || (mover != null && mover.IsMoving) || mainCam == null || gridManager == null || combat == null || unitStats == null)
         {
-            Debug.LogWarning($"OnClick on {gameObject.name} exited early at top guard. inputEnabled:{inputEnabled}, isMoving:{mover?.IsMoving}, mainCamNull:{mainCam == null}, gridNull:{gridManager==null}, combatNull:{combat==null}, highlighterNull:{highlighter==null}");
             return;
         }
 
@@ -180,166 +339,146 @@ public class UnitInputHandler : MonoBehaviour
         Vector2 screenPos = Mouse.current.position.ReadValue();
         Ray ray = mainCam.ScreenPointToRay(screenPos);
 
-        if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, groundLayerMask)) 
+        if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, groundLayerMask))
         {
             HexTile clickedTile = hit.collider.GetComponent<HexTile>();
-            if (clickedTile == null) 
+            if (clickedTile == null) return;
+
+            if (isInAttackMode)
             {
-                Debug.Log($"OnClick: Clicked on object '{hit.collider.gameObject.name}' on the 'Ground' layer, but it doesn't have a HexTile component.", this);
-                return;
+                HandleAttackModeClick(clickedTile);
             }
-            Debug.Log($"OnClick: Clicked on tile {clickedTile.coordinate} (Object: {hit.collider.name}, Layer: {LayerMask.LayerToName(hit.collider.gameObject.layer)}). IsInAttackMode: {highlighter.IsInAttackMode}", this);
-
-
-            if (highlighter.IsInAttackMode)
+            else
             {
-                Debug.Log("OnClick: In Attack Mode branch.", this);
-                Unit targetUnitOnTile = gridManager.GetUnitOnTile(clickedTile.coordinate);
-                
-                if (targetUnitOnTile != null)
-                {
-                    Debug.Log($"OnClick AttackMode: Found unit '{targetUnitOnTile.unitName}' of team '{targetUnitOnTile.Team}' on clicked tile.", this);
-                    if (targetUnitOnTile.Team != unit.Team)
-                    {
-                        Debug.Log("OnClick AttackMode: Target unit is an enemy.", this);
-                        HexTile myTile = gridManager.GetTileAt(mover.CurrentGridCoords);
-                        if (myTile == null)
-                        {
-                            Debug.LogError("OnClick AttackMode: Current unit's tile (myTile) is null!", this);
-                            return;
-                        }
-                        Debug.Log($"OnClick AttackMode: My tile is {myTile.coordinate}. Clicked tile for target is {clickedTile.coordinate}.", this);
-
-                        bool isAdjacent = false;
-                        List<HexTile> neighbors = gridManager.GetNeighbors(myTile);
-                        if (neighbors.Contains(clickedTile)) 
-                        {
-                            isAdjacent = true;
-                        }
-                        Debug.Log($"OnClick AttackMode: Is target adjacent? {isAdjacent}.", this);
-
-                        if (isAdjacent) 
-                        {
-                            if (unit.unitAP != null && unit.unitAP.CanSpend(UnitCombat.MELEE_ATTACK_AP_COST))
-                            {
-                                Debug.Log("OnClick AttackMode: AP sufficient. Performing melee attack.", this);
-                                combat.PerformMeleeAttack(targetUnitOnTile);
-                                highlighter.ToggleAttackMode(false); 
-                            }
-                            else
-                            {
-                                Debug.Log($"{unit?.unitName ?? gameObject.name} not enough AP to perform melee attack. Needed: {UnitCombat.MELEE_ATTACK_AP_COST}, Has: {unit?.unitAP?.CurrentAP}", this);
-                            }
-                        }
-                        else
-                        {
-                            Debug.Log("Target is not in melee range (not adjacent).", this);
-                        }
-                    }
-                    else
-                    {
-                        Debug.Log("OnClick AttackMode: Clicked unit is friendly. Cancelling attack mode.", this);
-                        highlighter.ToggleAttackMode(false);
-                    }
-                }
-                else
-                {
-                    Debug.Log("OnClick AttackMode: No unit on clicked tile. Cancelling attack mode.", this);
-                    highlighter.ToggleAttackMode(false); 
-                }
+                HandleMovementModeClick(clickedTile);
             }
-            else // Movement Mode
-            {
-                Debug.Log("OnClick: In Movement Mode branch.", this);
-                if (!clickedTile.isWalkable)
-                {
-                     Debug.Log("Clicked on a non-walkable tile for movement.", this);
-                     return; 
-                }
-
-                HexTile startTile = gridManager.GetTileAt(mover.CurrentGridCoords);
-                if (startTile == null)
-                {
-                    Debug.LogWarning("Could not find start tile at unit's current coordinates for movement.", this);
-                    return;
-                }
-
-                if (pathfinder == null) { 
-                    Debug.LogError("Pathfinder is null in OnClick movement logic!", this);
-                    return;
-                }
-
-                List<HexTile> path = pathfinder.FindPath(startTile, clickedTile);
-                if (path == null || path.Count < 2) 
-                {
-                    Debug.Log("No valid path found for movement or clicked on self.", this);
-                    return;
-                }
-
-                int pathApCost = 0;
-                for (int i = 1; i < path.Count; i++)
-                {
-                    if(path[i] == null || path[i].tileType == null) { 
-                        Debug.LogError("Path contains invalid tile data for cost calculation.", this);
-                        return;
-                    }
-                    pathApCost += path[i].tileType.moveCost;
-                }
-
-                if (unit.unitAP != null && unit.unitAP.CanSpend(pathApCost)) 
-                {
-                    Debug.Log($"Path found to {clickedTile.coordinate} with {path.Count-1} steps. Cost: {pathApCost} AP.", this);
-                    mover.MoveAlongPath(path);
-                }
-                else
-                {
-                    Debug.Log($"Not enough AP for this move. Needed: {pathApCost}, Have: {unit?.unitAP?.CurrentAP}.", this);
-                }
-            }
-        }
-        else // Raycast didn't hit anything ON THE SPECIFIED LAYER
-        {
-            // MODIFIED DEBUG LOG
-            Debug.Log($"OnClick: Raycast did not hit any colliders on the 'groundLayerMask'. Ensure tiles are on this layer AND the layer is selected in the UnitInputHandler's 'Ground Layer Mask' Inspector field.", this);
         }
     }
+
+    private void HandleAttackModeClick(HexTile clickedTile)
+    {
+        Unit targetUnitOnTile = gridManager.GetUnitOnTile(clickedTile.coordinate);
+
+        if (targetUnitOnTile != null && targetUnitOnTile.Team != unit.Team)
+        {
+            HexTile myTile = gridManager.GetTileAt(mover.CurrentGridCoords);
+            if (myTile == null) { Debug.LogError("AttackModeClick: Current unit's tile is null!", this); return; }
+
+            int distanceToTarget = HexUtils.HexDistance(myTile.coordinate, clickedTile.coordinate); // Ensure HexUtils.HexDistance is available
+
+            bool actionTaken = false;
+            if (unitStats.rangedAttackRange > 0 && distanceToTarget <= unitStats.rangedAttackRange && unit.unitAP.CanSpend(unitStats.rangedAPCost))
+            {
+                if (combat.CanPerformRangedAttackChecks(targetUnitOnTile)) // Use UnitCombat's LOS check
+                {
+                    combat.PerformRangedAttack(targetUnitOnTile);
+                    actionTaken = true;
+                } else {
+                     Debug.Log($"UnitInputHandler ({unit.unitName}): Ranged attack on {targetUnitOnTile.unitName} failed LOS or other checks in UnitCombat.");
+                }
+            }
+            else if (unitStats.meleeAttackRange > 0 && distanceToTarget <= unitStats.meleeAttackRange && unit.unitAP.CanSpend(unitStats.meleeAPCost))
+            {
+                // Assuming melee doesn't need an extra LOS check here if adjacent
+                combat.PerformMeleeAttack(targetUnitOnTile);
+                actionTaken = true;
+            }
+            else
+            {
+                Debug.Log($"Target '{targetUnitOnTile.unitName}' is out of range for available AP or attack types.");
+            }
+
+            if (actionTaken)
+            {
+                SetModeToMovementAndUpdateHighlights();
+            }
+        }
+        else 
+        {
+            SetModeToMovementAndUpdateHighlights(); // Clicked empty/friendly, exit attack mode
+        }
+    }
+    
+    private void SetModeToMovementAndUpdateHighlights()
+    {
+        isInAttackMode = false; 
+        if (TileHighlighterService.Instance != null) TileHighlighterService.Instance.ClearAttackRange();
+        UpdateMovementRangeHighlight(); // Refresh move range based on remaining AP
+    }
+
+
+    private void HandleMovementModeClick(HexTile clickedTile)
+    {
+        if (!clickedTile.isWalkable) return;
+
+        HexTile startTile = gridManager.GetTileAt(mover.CurrentGridCoords);
+        if (startTile == null) return;
+
+        if (pathfinder == null) { Debug.LogError("Pathfinder is null in MovementClick!", this); return; }
+
+        List<HexTile> path = pathfinder.FindPath(startTile, clickedTile);
+        if (path == null || path.Count < 2) return;
+
+        int pathApCost = CalculatePathAPCost(path);
+
+        if (unit.unitAP.CanSpend(pathApCost))
+        {
+            mover.MoveAlongPath(path);
+            // After move, HandleActiveUnitChanged will be called if turn ends.
+            // If turn doesn't end, movement range might need explicit refresh if AP changed.
+            // The UnitMover.OnMoveComplete -> UnitHighlighter.HandleMoveComplete -> UpdateHighlightsBasedOnMode
+            // is now GONE. So we need to refresh highlights after a move IF the unit still has its turn.
+            // For now, let's assume HandleActiveUnitChanged will cover it if turn ends.
+            // If not, we will need to call UpdateMovementRangeHighlight() after mover.MoveAlongPath completes.
+            // This usually means UnitMover needs an OnMoveCompletedAction event.
+            // Since UnitMover.OnMoveComplete was already there, let's assume UIH's old sub isn't needed.
+            // The next Update() or HandleActiveUnitChanged should refresh highlights correctly.
+            if(TileHighlighterService.Instance != null) TileHighlighterService.Instance.ClearPathPreview();
+        }
+        else
+        {
+            Debug.Log($"Not enough AP for this move. Needed: {pathApCost}, Have: {unit.unitAP.CurrentAP}.", this);
+        }
+    }
+    
+    private int CalculatePathAPCost(List<HexTile> path)
+    {
+        if (path == null || path.Count < 2) return 0;
+        int cost = 0;
+        for (int i = 1; i < path.Count; i++) 
+        {
+            if (path[i] == null || path[i].tileType == null)
+            {
+                Debug.LogError("Path for AP cost calculation contains invalid tile data.", this);
+                return int.MaxValue; 
+            }
+            cost += path[i].tileType.moveCost;
+        }
+        return cost;
+    }
+
 
     private void OnEndTurn(InputAction.CallbackContext context)
     {
         EndTurn();
     }
 
-    public void EndTurn() 
+    public void EndTurn()
     {
-        if (!inputEnabled) 
-        {
-            return; 
-        }
+        if (!inputEnabled) return;
+        if (mover != null && mover.IsMoving) return;
 
-        if (mover != null && mover.IsMoving)
-        {
-            Debug.Log("Cannot end turn while moving.", this);
-            return;
-        }
-        
-        if (highlighter != null && highlighter.IsInAttackMode)
-        {
-            highlighter.ToggleAttackMode(false);
-        }
+        isInAttackMode = false; 
+        if(TileHighlighterService.Instance != null) TileHighlighterService.Instance.ClearAllHighlights();
 
-        var manager = TacticalCombatManager.Instance; 
-        if (manager != null && manager.CurrentUnit == unit && manager.IsPlayerTurn) 
+        var manager = TacticalCombatManager.Instance;
+        if (manager != null && manager.CurrentUnit == unit && manager.IsPlayerTurn)
         {
-            Debug.Log($"Ending player turn for {unit?.unitName ?? gameObject.name} via input handler.", this);
             manager.EndCurrentTurn();
-        }
-        else
-        {
-            Debug.LogWarning($"Attempted to end turn for {unit?.unitName ?? gameObject.name}, but it's not their active turn, manager is null, or combat not active.", this);
         }
     }
 
-    public bool IsInputEnabledForDebug()
+    public bool IsInputEnabledForDebug() 
     {
         return inputEnabled;
     }

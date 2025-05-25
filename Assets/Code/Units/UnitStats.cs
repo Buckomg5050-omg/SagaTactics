@@ -1,3 +1,5 @@
+// File: UnitStats.cs
+// (Showing only modifications and relevant surrounding code)
 using UnityEngine;
 
 public class UnitStats : MonoBehaviour
@@ -10,7 +12,7 @@ public class UnitStats : MonoBehaviour
     [Space(10)]
     [Header("Essences (Base Stats)")]
     public int Core = 10;    // Strength (melee/physical damage contribution)
-    public int Spark = 8;    // Intelligence (magic damage contribution - for future)
+    public int Spark = 8;    // Intelligence (magic damage contribution - for future OR RANGED DAMAGE)
     public int Echo = 12;    // Dexterity (accuracy, evasion, turn order)
     public int Pulse = 10;   // Constitution (determines max health)
     public int Glimmer = 8;  // Wisdom (support effects, magic defense - for future)
@@ -21,8 +23,15 @@ public class UnitStats : MonoBehaviour
     [Header("Derived Combat Attributes")]
     public int maxHealth;     // Calculated from Pulse
     public int currentHealth;
-    // public int moveRange = 4; // This seems to be handled by UnitMover.cs, consider if needed here
-    // public int actionPoints = 2; // This is a base/default, UnitAP.cs manages current/max runtime AP
+    
+    // START OF MODIFICATIONS ---
+    [Space(10)]
+    [Header("Attack Properties")]
+    public int meleeAttackRange = 1; // Default melee range (usually 1 for adjacent)
+    public int rangedAttackRange = 0; // Default to 0, meaning no ranged attack. Set > 0 for ranged units.
+    public int meleeAPCost = 1;
+    public int rangedAPCost = 1; // Can be different from melee
+    // --- END OF MODIFICATIONS
 
     // Dynamic combat modifiers (intended to be set by terrain, buffs, status effects etc.)
     // These are typically ADDITIVE or MULTIPLICATIVE bonuses/penalties to base stats or derived values.
@@ -43,6 +52,11 @@ public class UnitStats : MonoBehaviour
         {
             // GDD Abilities: Power Strike, Shield Bash, Rallying Cry
             abilities = new string[] { "PowerStrike" }; // Just Power Strike for now
+        }
+        else if (className == "Archer") // Example for Archer
+        {
+            abilities = new string[] { "PreciseShot" };
+            // We'll set rangedAttackRange in the Inspector for the Archer prefab
         }
         // Add more class initialization here later
     }
@@ -103,6 +117,21 @@ public class UnitStats : MonoBehaviour
         className = newClassName;
         // TODO: Implement actual stat/ability changes, recalculate derived stats
         CalculateDerivedStats(); // Recalculate health if Pulse changes with class
+        // START OF MODIFICATIONS ---
+        // Potentially update default attack ranges/costs if they change with class
+        if (className == "Archer")
+        {
+            // Example: ensure rangedAttackRange is set if changing TO Archer
+            // This should primarily be set in prefab, but good for dynamic class changes
+            if (rangedAttackRange == 0) rangedAttackRange = 5; // Default archer range
+            meleeAttackRange = 1; // Archers can still melee
+        }
+        else if (className == "Warrior")
+        {
+            rangedAttackRange = 0; // Warriors typically don't have innate ranged
+            meleeAttackRange = 1;
+        }
+        // --- END OF MODIFICATIONS
         Debug.Log($"{unitName} changed class to " + newClassName);
     }
 

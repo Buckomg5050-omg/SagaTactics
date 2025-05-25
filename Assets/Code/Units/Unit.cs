@@ -1,25 +1,27 @@
+// File: Unit.cs
 using UnityEngine;
 
 public class Unit : MonoBehaviour
 {
     public enum UnitTeam { Player, Enemy, Neutral }
 
-    public string unitName = "Unit"; // Will be synced with UnitStats.unitName if available
-    // public bool isPlayerControlled = true; // Team enum + UnitInputHandler/EnemyAIController implies this
+    public string unitName = "Unit"; 
+    
+    public int Echo = 5; // For initiative
+    public int Aura = 3; // For initiative tie-breaking
 
-    public int Echo = 5;
-    public int Aura = 3;
-
+    // Component References
     public UnitInputHandler playerInput { get; private set; }
     public EnemyAIController aiController { get; private set; }
     public UnitAP unitAP { get; private set; }
     public UnitSelector unitSelector { get; private set; }
     public UnitStats unitStats { get; private set; }
-    public UnitFacing unitFacing { get; private set; } // NEW: Reference to UnitFacing
+    public UnitFacing unitFacing { get; private set; }
+    public UnitMover unitMover { get; private set; } // Added for completeness if needed elsewhere
 
     public UnitTeam Team { get; private set; }
 
-    private TurnIndicatorUI turnIndicator;
+    private TurnIndicatorUI turnIndicator; // Assuming this is your UI for turns
 
     void Awake()
     {
@@ -28,20 +30,43 @@ public class Unit : MonoBehaviour
         unitAP = GetComponent<UnitAP>();
         unitSelector = GetComponent<UnitSelector>();
         unitStats = GetComponent<UnitStats>();
-        unitFacing = GetComponent<UnitFacing>(); // NEW: Get UnitFacing
+        unitFacing = GetComponent<UnitFacing>();
+        unitMover = GetComponent<UnitMover>(); // Initialize Mover
 
+        // Critical component checks
         if (unitStats == null) Debug.LogError($"Unit '{gameObject.name}' is missing a UnitStats component!", this);
         if (unitAP == null) Debug.LogError($"Unit '{gameObject.name}' is missing a UnitAP component!", this);
+        if (unitMover == null) Debug.LogWarning($"Unit '{gameObject.name}' is missing a UnitMover component. Movement might be impaired.", this);
+        // UnitFacing is optional per earlier logs, so a warning is fine.
         if (unitFacing == null) Debug.LogWarning($"Unit '{gameObject.name}' is missing a UnitFacing component. Facing logic might be limited.", this);
         
+        // Sync unitName from UnitStats if available
         if (unitStats != null && !string.IsNullOrEmpty(unitStats.unitName))
         {
             this.unitName = unitStats.unitName;
         }
 
-        if (CompareTag("PlayerUnit")) Team = UnitTeam.Player;
-        else if (CompareTag("EnemyUnit")) Team = Unit.UnitTeam.Enemy; // Corrected typo
-        else Team = UnitTeam.Neutral;
+        // Determine Team based on GameObject Tag
+        if (CompareTag("PlayerUnit"))
+        {
+            Team = UnitTeam.Player;
+            if (aiController != null) aiController.enabled = false; // Disable AI for player units
+            if (playerInput != null) playerInput.enabled = true; // Ensure input handler is enabled for player
+        }
+        else if (CompareTag("EnemyUnit"))
+        {
+            Team = UnitTeam.Enemy;
+            if (playerInput != null) playerInput.enabled = false; // Disable PlayerInput for AI units
+            if (aiController != null) aiController.enabled = true; // Ensure AI is enabled
+        }
+        else
+        {
+            Team = UnitTeam.Neutral;
+            if (playerInput != null) playerInput.enabled = false;
+            if (aiController != null) aiController.enabled = false;
+        }
+        // Note: UnitInputHandler's internal 'inputEnabled' flag is managed by HandleActiveUnitChanged
+        // based on whose turn it is, so we don't need to call an EnableInput method here anymore.
     }
 
     public void BeginTurn()
@@ -56,30 +81,17 @@ public class Unit : MonoBehaviour
                       $"Core: {unitStats.Core}, " +
                       $"Defense: {unitStats.Defense}");
         }
-        // ... (other logs)
-
-        unitSelector?.SetSelected(true);
-
-        // Active unit should initially hold its facing from end of last turn, or snap to a default action-ready facing.
-        // Movement and attack commands will then dictate its facing.
-        // We don't want it to immediately try to face camera if it's about to act.
-        if (unitFacing != null)
-        {
-            // unitFacing.HoldCurrentFacing(); // Let actions during the turn define facing.
-            // Or, if it just finished moving via AI and is now starting its "action" phase:
-            // it would already be holding from UnitMover.
-        }
-
+        
+        unitSelector?.SetSelected(true); // Visually select the unit
 
         if (turnIndicator == null) turnIndicator = FindFirstObjectByType<TurnIndicatorUI>();
         turnIndicator?.ShowTurn(unitName, Team == UnitTeam.Player);
 
-        if (Team == UnitTeam.Player && playerInput != null)
-        {
-            playerInput.EnableInput(true);
-            // Debug.Log($"Unit ({unitName}): Called playerInput.EnableInput(true). playerInput.inputEnabled is now: {playerInput.IsInputEnabledForDebug()}", this);
-        }
-        else if (Team == UnitTeam.Enemy && aiController != null)
+        // UnitInputHandler is now responsible for enabling/disabling its own input processing
+        // based on the OnActiveUnitChanged event from TacticalCombatManager.
+        // So, no direct call to playerInput.EnableInput(true); is needed here.
+
+        if (Team == UnitTeam.Enemy && aiController != null && aiController.enabled)
         {
             aiController.RunAI();
         }
@@ -87,25 +99,23 @@ public class Unit : MonoBehaviour
 
     public void EndTurn()
     {
-        unitSelector?.SetSelected(false);
+        unitSelector?.SetSelected(false); // Visually deselect the unit
 
-        if (Team == UnitTeam.Player && playerInput != null)
-        {
-            // Debug.Log($"Unit ({unitName}): Preparing to call playerInput.EnableInput(false). playerInput.inputEnabled is currently: {playerInput.IsInputEnabledForDebug()}", this);
-            playerInput.EnableInput(false);
-        }
+        // UnitInputHandler is now responsible for enabling/disabling its own input processing
+        // based on the OnActiveUnitChanged event from TacticalCombatManager.
+        // So, no direct call to playerInput.EnableInput(false); is needed here.
 
-        // When any unit's turn ends, it should now try to face the camera (idle behavior)
-        // This will be reinforced by TacticalCombatManager for non-active units.
         if (unitFacing != null)
         {
-            Debug.Log($"Unit ({unitName}): Turn ended. Telling UnitFacing to look towards camera.", this);
+            // Debug.Log($"Unit ({unitName}): Turn ended. Telling UnitFacing to look towards camera.", this);
             unitFacing.SetTargetLookTowardsCamera();
         }
     }
 
     public bool ShouldAutoEndTurn()
     {
+        // Ends turn if out of AP or cannot perform any more meaningful actions.
+        // This could be more complex, e.g., if unit has 0 AP actions.
         return unitAP != null && (unitAP.CurrentAP <= 0);
     }
 }
